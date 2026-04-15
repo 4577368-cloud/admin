@@ -22,10 +22,24 @@ const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(
 const llmBaseUrl = String(process.env.VLLM_BASE_URL || '').trim().replace(/\/+$/, '');
 const llmApiKey = String(process.env.VLLM_API_KEY || '').trim();
 const llmModelId = String(process.env.VLLM_MODEL_ID || '').trim();
+const ANALYTICS_START_AT_ISO = String(process.env.ADMIN_ANALYTICS_START_AT || '2026-04-14T00:00:00+08:00').trim();
+const INTERNAL_TEST_EMAILS = new Set([
+  'liumengyu594@gmail.com',
+  'service@tangbuy.net',
+  'eriahhhhh@gmail.com',
+  'sinslust@163.com',
+  'arhuhibegu08666@gmail.com',
+  'leocarnon@gmail.com',
+  'dorammamazing@gmail.com',
+  'g31jess@gmail.com',
+  'llinweiran@gmail.com',
+  'doravm9413@gmail.com',
+  '4577368@gmail.com',
+]);
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error('[backend-local] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-  process.exit(1);
+
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -163,6 +177,14 @@ function normalizeTrendsPayload(data) {
     }
   }
   return [];
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isInternalTestEmail(email) {
+  return INTERNAL_TEST_EMAILS.has(normalizeEmail(email));
 }
 
 /** 随仓库打包的只读 schema；Vercel 上不可写盘，刷新时写入 /tmp（仅当次实例有效） */
@@ -813,7 +835,9 @@ function matchPresetQuestion(question) {
 /**
  * Paginated fetch of all Auth users (local admin only). Used when SQL RPCs are missing.
  */
-async function fetchAllAuthUsersForAdmin() {
+async function fetchAllAuthUsersForAdmin(options = {}) {
+  const excludeInternal = options.excludeInternal === true;
+  const createdAtGteIso = String(options.createdAtGteIso || '').trim();
   const allUsers = [];
   let p = 1;
   const perFetch = 200;
@@ -826,7 +850,17 @@ async function fetchAllAuthUsersForAdmin() {
     if (batch.length < perFetch) break;
     p += 1;
   }
-  return allUsers;
+  let users = allUsers;
+  if (createdAtGteIso) {
+    const minTs = new Date(createdAtGteIso).getTime();
+    if (!Number.isNaN(minTs)) {
+      users = users.filter((u) => new Date(u.created_at || 0).getTime() >= minTs);
+    }
+  }
+  if (excludeInternal) {
+    users = users.filter((u) => !isInternalTestEmail(u.email));
+  }
+  return users;
 }
 
 async function loadVipUserIdSet() {
@@ -868,7 +902,10 @@ async function mapUserIdsToAuthInfo(userIds) {
 }
 
 async function buildOverviewFallback() {
-  const users = await fetchAllAuthUsersForAdmin();
+  const users = await fetchAllAuthUsersForAdmin({
+    excludeInternal: true,
+    createdAtGteIso: ANALYTICS_START_AT_ISO,
+  });
   const vipSet = await loadVipUserIdSet();
   const now = Date.now();
   const d7 = now - 7 * 86400000;
@@ -891,6 +928,7 @@ async function buildOverviewFallback() {
     const { data: anonData, error: anonErr } = await supabase
       .from('share_link_visits')
       .select('id', { count: 'exact', head: true })
+      .gte('created_at', ANALYTICS_START_AT_ISO)
       .eq('visitor_is_anonymous', true);
     if (!anonErr) total_anon_visitors = anonData?.count || 0;
   } catch (e) {
@@ -902,7 +940,8 @@ async function buildOverviewFallback() {
   try {
     const { data: attrData, error: attrErr } = await supabase
       .from('share_link_oauth_attributions')
-      .select('id', { count: 'exact', head: true });
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', ANALYTICS_START_AT_ISO);
     if (!attrErr) share_attributed_emails = attrData?.count || 0;
   } catch (e) {
     console.warn('[admin] share attributed emails count:', e?.message);
@@ -915,7 +954,8 @@ async function buildOverviewFallback() {
   try {
     const { data: inqData, error: inqErr } = await supabase
       .from('product_inquiries')
-      .select('id, status, created_at', { count: 'exact' });
+      .select('id, status, created_at', { count: 'exact' })
+      .gte('created_at', ANALYTICS_START_AT_ISO);
     if (!inqErr && inqData) {
       total_inquiries = inqData.length;
       replied_inquiries = inqData.filter((r) => r.status === 'replied').length;
@@ -941,6 +981,38 @@ async function buildOverviewFallback() {
   };
 }
 
+async function buildUserTrendsFallback(days) {
+  const n = Math.max(1, Math.min(365, Number(days) || 30));
+  const users = await fetchAllAuthUsersForAdmin({
+    excludeInternal: true,
+    createdAtGteIso: ANALYTICS_START_AT_ISO,
+  });
+  const vipSet = await loadVipUserIdSet();
+  const end = new Date();
+  const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+  const startUtc = new Date(endUtc);
+  startUtc.setUTCDate(startUtc.getUTCDate() - (n - 1));
+  const analyticsStartTs = new Date(ANALYTICS_START_AT_ISO).getTime();
+  const rangeStartTs = Number.isNaN(analyticsStartTs) ? startUtc.getTime() : Math.max(startUtc.getTime(), analyticsStartTs);
+  const dayMap = new Map();
+  for (let i = 0; i < n; i += 1) {
+    const d = new Date(startUtc);
+    d.setUTCDate(d.getUTCDate() + i);
+    const k = d.toISOString().slice(0, 10);
+    dayMap.set(k, { date: k, new_users: 0, new_vip_users: 0 });
+  }
+  for (const u of users) {
+    const ts = new Date(u.created_at || 0).getTime();
+    if (Number.isNaN(ts) || ts < rangeStartTs) continue;
+    const day = new Date(ts).toISOString().slice(0, 10);
+    const row = dayMap.get(day);
+    if (!row) continue;
+    row.new_users += 1;
+    if (vipSet.has(String(u.id))) row.new_vip_users += 1;
+  }
+  return Array.from(dayMap.values());
+}
+
 async function fetchAllPromptLogsSince(sinceIso) {
   const all = [];
   const pageSize = 1000;
@@ -964,11 +1036,15 @@ async function fetchAllPromptLogsSince(sinceIso) {
 
 async function buildConversationUsageFallback(days) {
   const n = Math.max(1, Math.min(365, days));
-  const users = await fetchAllAuthUsersForAdmin();
+  const users = await fetchAllAuthUsersForAdmin({
+    excludeInternal: true,
+    createdAtGteIso: ANALYTICS_START_AT_ISO,
+  });
   const anonById = new Map();
   for (const u of users) {
     anonById.set(String(u.id), !!u.is_anonymous);
   }
+  const allowedUserIds = new Set(users.map((u) => String(u.id)));
   const vipById = new Map();
   const { data: statsRows, error: statsErr } = await supabase.from('user_stats').select('user_id, is_vip');
   if (statsErr) {
@@ -982,7 +1058,9 @@ async function buildConversationUsageFallback(days) {
   const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
   const startUtc = new Date(endUtc);
   startUtc.setUTCDate(startUtc.getUTCDate() - (n - 1));
-  const sinceIso = startUtc.toISOString();
+  const analyticsStartTs = new Date(ANALYTICS_START_AT_ISO).getTime();
+  const sinceTs = Number.isNaN(analyticsStartTs) ? startUtc.getTime() : Math.max(startUtc.getTime(), analyticsStartTs);
+  const sinceIso = new Date(sinceTs).toISOString();
 
   let logs = [];
   try {
@@ -1020,6 +1098,7 @@ async function buildConversationUsageFallback(days) {
     const b = bucket.get(dayKey);
     if (!b) continue;
     const uid = String(row.user_id || '');
+    if (!allowedUserIds.has(uid)) continue;
     const isAnon = anonById.get(uid) === true;
     const isVip = vipById.get(uid) === true;
     b.total_prompts += 1;
@@ -1120,11 +1199,6 @@ app.use('/admin/api', requireAdminAuth);
 
 app.get('/admin/api/overview', async (_req, res) => {
   try {
-    const { data, error } = await supabase.rpc('admin_overview');
-    if (!error) {
-      return res.json({ ok: true, data });
-    }
-    console.warn('[admin] admin_overview RPC failed, using Auth + user_stats fallback:', error.message);
     const fallback = await buildOverviewFallback();
     return res.json({ ok: true, data: fallback });
   } catch (e) {
