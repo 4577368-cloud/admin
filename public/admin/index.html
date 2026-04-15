@@ -1,0 +1,1771 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Local Admin Dashboard</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #0b1020; color: #e6eaf2; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .layout { display: flex; gap: 20px; }
+    .sidebar { width: 180px; flex-shrink: 0; position: sticky; top: 20px; height: fit-content; }
+    .sidebar-title { font-size: 14px; font-weight: 700; color: #9fb0d4; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+    .sidebar-nav a { display: block; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #c8d4ee; text-decoration: none; transition: all 0.15s; }
+    .sidebar-nav a:hover { background: #1e293b; color: #fff; }
+    .sidebar-nav a.active { background: #3b82f6; color: #fff; }
+    .main { flex: 1; min-width: 0; }
+    .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    button { background: #3b82f6; color: white; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .card { background: #11182d; border: 1px solid #1f2a44; border-radius: 10px; padding: 12px; }
+    .k { color: #9fb0d4; font-size: 12px; }
+    .v { font-size: 26px; font-weight: 700; margin-top: 6px; }
+    .panel { background: #11182d; border: 1px solid #1f2a44; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px; border-bottom: 1px solid #1f2a44; text-align: left; }
+    input { background: #0b1020; color: #e6eaf2; border: 1px solid #243253; border-radius: 8px; padding: 8px; }
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .muted { color: #98a6c6; font-size: 12px; }
+    pre { margin: 0; max-height: 220px; overflow: auto; background: #0b1020; border: 1px solid #1f2a44; padding: 8px; border-radius: 8px; }
+    .err { color: #fca5a5; font-size: 12px; margin-top: 6px; white-space: pre-wrap; }
+    .chart-wrap { position: relative; height: 280px; margin-top: 8px; }
+    details summary { cursor: pointer; color: #9fb0d4; font-size: 13px; margin-top: 10px; }
+    .mini-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .mini-cards .card .v { font-size: 20px; }
+    .preview-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .context-cell { max-width: 380px; white-space: normal; word-break: break-word; line-height: 1.45; }
+    .urls-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #98a6c6; }
+    textarea { background: #0b1020; color: #e6eaf2; border: 1px solid #243253; border-radius: 8px; padding: 10px; width: 100%; }
+    h3.panel-title { margin: 0 0 10px 0; font-size: 15px; font-weight: 600; color: #c8d4ee; }
+    .url-link { color: #7fe7ff; text-decoration: none; }
+    .url-link:hover { color: #b9f3ff; text-decoration: underline; }
+    .nlq-presets { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+    .nlq-preset-btn { background: #1e293b; color: #dbeafe; border: 1px solid #334155; border-radius: 999px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+    .nlq-chat { border: 1px solid #1f2a44; border-radius: 10px; background: #0b1020; min-height: 160px; max-height: 360px; overflow: auto; overflow-anchor: none; padding: 8px 10px; }
+    .nlq-card { border: 1px solid #243253; border-radius: 8px; background: #0f172a; margin-bottom: 8px; }
+    .nlq-card-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #2d5a46; gap: 8px; background: linear-gradient(90deg, #142a1f 0%, #1e293b 100%); }
+    .nlq-card-q { font-size: 12px; color: #7dffb3; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nlq-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .nlq-card-btn { background: #1e293b; color: #dbeafe; border: 1px solid #334155; border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+    .nlq-card-body { padding: 8px 10px; }
+    .nlq-card-body.nlq-card-body--loading { min-height: 100px; }
+    .nlq-msg { margin-bottom: 6px; max-width: 100%; white-space: pre-wrap; line-height: 1.35; word-break: break-word; font-size: 13px; }
+    .nlq-msg-ai { color: #e2e8f0; }
+    .nlq-msg-ai strong { color: #f8fafc; font-weight: 700; }
+    .nlq-msg-ai a { color: #7fe7ff; text-decoration: underline; }
+    .nlq-msg-ai a:hover { color: #b9f3ff; }
+    .nlq-hi-token { color: #f8fafc; font-weight: 700; }
+    .nlq-msg-ai p { margin: 0 0 4px; }
+    .nlq-msg-ai p:last-child { margin-bottom: 0; }
+    .nlq-msg-ai ul, .nlq-msg-ai ol { margin: 2px 0 4px 16px; padding: 0; }
+    .nlq-msg-ai li { margin: 0 0 2px; }
+    .nlq-msg-ai br + br { display: none; }
+    .model-reply-details { border: 1px solid #243253; border-radius: 8px; margin: 0 0 8px; background: #0f172a; }
+    .model-reply-details > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      align-items: baseline;
+      font-size: 13px;
+    }
+    .model-reply-details > summary::-webkit-details-marker { display: none; }
+    .model-reply-sum-time { font-weight: 600; color: #e2e8f0; flex-shrink: 0; }
+    .model-reply-sum-model { color: #94a3b8; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .model-reply-sum-conv code { font-size: 11px; color: #7fe7ff; }
+    .model-reply-sum-user { color: #c4b5fd; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; font-size: 12px; }
+    .model-reply-sum-peek { flex: 1; min-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #98a6c6; font-size: 12px; }
+    .model-reply-body { padding: 0 12px 12px; border-top: 1px solid #1f2a44; }
+    .model-reply-block { margin-top: 10px; }
+    .model-reply-block .lbl { font-size: 11px; color: #9fb0d4; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+    .model-reply-block .body { white-space: pre-wrap; word-break: break-word; line-height: 1.45; font-size: 13px; color: #e6eaf2; max-height: 320px; overflow: auto; padding: 8px; background: #0b1020; border-radius: 6px; border: 1px solid #1f2a44; }
+    .btn-mini { background: #1e293b; color: #dbeafe; border: 1px solid #334155; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+    .btn-mini:hover { background: #334155; }
+    .uid-cell code { font-size: 11px; color: #7fe7ff; word-break: break-all; }
+    .user360-grid { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 16px; align-items: start; margin-top: 12px; }
+    @media (max-width: 960px) { .user360-grid { grid-template-columns: 1fr; } }
+    .user360-chat-split { display: grid; grid-template-columns: 240px 1fr; gap: 0; border: 1px solid #1f2a44; border-radius: 10px; overflow: hidden; min-height: 280px; }
+    @media (max-width: 700px) { .user360-chat-split { grid-template-columns: 1fr; } }
+    .user360-conv-list { max-height: 480px; overflow: auto; background: #0b1020; border-right: 1px solid #1f2a44; }
+    .user360-conv-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #1f2a44; }
+    .user360-conv-item:hover { background: #11182d; }
+    .user360-conv-item.active { background: #1e3a5f; border-left: 3px solid #3b82f6; padding-left: 9px; }
+    .user360-turns { max-height: 480px; overflow: auto; padding: 10px 12px; background: #0f172a; font-size: 13px; }
+    .inq-mini { font-size: 12px; line-height: 1.45; border-bottom: 1px solid #1f2a44; padding: 8px 0; }
+    .user360-pick:hover { background: #1e293b; }
+    .auth-ops { display: flex; align-items: center; gap: 8px; }
+    .auth-user { font-size: 12px; color: #c8d4ee; }
+    .login-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(3, 8, 20, 0.82); display: none; align-items: center; justify-content: center; }
+    .login-card { width: min(420px, 92vw); background: #11182d; border: 1px solid #1f2a44; border-radius: 14px; padding: 22px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); }
+    .login-title { margin: 0 0 14px; font-size: 18px; color: #e2e8f0; }
+    .login-card input[type="text"], .login-card input[type="password"] { width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+    .login-remember { display: flex; align-items: center; gap: 6px; margin: 4px 0 12px; font-size: 12px; color: #9fb0d4; }
+    .app-locked { filter: blur(1.5px); pointer-events: none; user-select: none; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h2 style="margin:0;">Tangbuy Agent 管理后台</h2>
+      <div class="auth-ops">
+        <span id="authUserText" class="auth-user">未登录</span>
+        <button id="logoutBtn" style="display:none;background:#475569;">退出登录</button>
+        <button id="refreshBtn">刷新</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-title">导航</div>
+        <nav class="sidebar-nav" id="sidebarNav">
+          <a href="#overview">总览</a>
+          <a href="#trends">趋势分析</a>
+          <a href="#users">用户管理</a>
+          <a href="#user360">用户画像</a>
+          <a href="#shares">分享裂变</a>
+          <a href="#conversations">对话与模型</a>
+          <a href="#links">链接明细</a>
+          <a href="#inquiries">询盘管理</a>
+          <a href="#nlq">自然语言查询</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+    <!-- 总览 -->
+    <div id="overview" class="cards" style="scroll-margin-top: 20px;">
+      <div class="card"><div class="k">总用户</div><div class="v" id="mTotal">-</div></div>
+      <div class="card"><div class="k">VIP 用户</div><div class="v" id="mVip">-</div></div>
+      <div class="card"><div class="k">VIP 占比</div><div class="v" id="mVipRatio">-</div></div>
+      <div class="card"><div class="k">今日新增用户</div><div class="v" id="mTodayNew">-</div></div>
+      <div class="card"><div class="k">分享归因邮箱</div><div class="v" id="mShareAttr">-</div></div>
+      <div class="card"><div class="k">总匿名访客</div><div class="v" id="mAnonVisits">-</div></div>
+      <div class="card"><div class="k">总询盘数</div><div class="v" id="mTotalInq">-</div></div>
+      <div class="card"><div class="k">询盘已回复</div><div class="v" id="mRepliedInq">-</div></div>
+      <div class="card"><div class="k">今日新增询盘</div><div class="v" id="mTodayInq">-</div></div>
+      <div class="card"><div class="k">近 30 天新增</div><div class="v" id="m30d">-</div></div>
+    </div>
+    <div class="err" id="errOverview" style="margin-bottom:12px;"></div>
+
+    <div class="row" style="margin-bottom: 14px; flex-wrap: wrap;">
+      <span class="muted">全局统计天数</span>
+      <select id="usageDays" style="padding:6px 10px;">
+        <option value="14">14 天</option>
+        <option value="30" selected>30 天</option>
+        <option value="90">90 天</option>
+      </select>
+    </div>
+
+    <!-- 趋势分析 -->
+    <div id="trends" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">趋势分析</h3>
+      <div class="row" style="justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px;">
+        <div class="k">新增用户与 VIP 趋势</div>
+        <div class="row" style="margin-bottom:0;">
+          <label class="muted">天数</label>
+          <select id="trendDays" style="padding:6px 10px;">
+            <option value="14">14 天</option>
+            <option value="30" selected>30 天</option>
+            <option value="90">90 天</option>
+          </select>
+        </div>
+      </div>
+      <div class="err" id="errTrends"></div>
+      <div class="chart-wrap">
+        <canvas id="trendsChart" aria-label="新增用户与 VIP 趋势"></canvas>
+      </div>
+      <details>
+        <summary>查看原始 JSON</summary>
+        <pre id="trendsJson">[]</pre>
+      </details>
+
+      <div style="margin-top: 20px; border-top: 1px solid #1f2a44; padding-top: 16px;">
+        <h3 class="panel-title" style="margin-bottom: 10px;">对话用量（按日）</h3>
+        <div class="err" id="errConv"></div>
+        <div class="chart-wrap">
+          <canvas id="convChart" aria-label="对话用量趋势"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 用户管理 -->
+    <div id="users" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">用户管理</h3>
+      <div class="row">
+        <input id="kw" placeholder="邮箱关键词" />
+        <label><input type="checkbox" id="vipOnly" /> 仅 VIP</label>
+        <button id="queryUsersBtn">查询用户</button>
+      </div>
+      <div class="err" id="errUsers"></div>
+      <table>
+        <thead><tr><th>用户 ID</th><th>Email</th><th>VIP</th><th>注册时间</th><th>最后登录</th></tr></thead>
+        <tbody id="usersTbody"></tbody>
+      </table>
+      <div class="muted" id="usersMeta" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- 用户画像 360 -->
+    <div id="user360" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">用户画像（邮箱或访客 UUID）</h3>
+      <div class="row">
+        <input id="user360Q" type="text" placeholder="完整邮箱或用户 UUID" style="min-width:280px;flex:1;" />
+        <button type="button" id="user360Btn">查询</button>
+      </div>
+      <p class="muted" style="margin:6px 0 8px;">支持精确邮箱或 UUID。多条邮箱匹配时会列出候选；匿名访客需用 UUID（可在上方「用户管理」复制）。</p>
+      <div class="err" id="errUser360"></div>
+      <div id="user360Candidates"></div>
+      <div id="user360Result" style="display:none;">
+        <div class="user360-grid">
+          <div>
+            <div id="user360Summary"></div>
+            <div id="user360ShareInq" style="margin-top:12px;"></div>
+          </div>
+          <div>
+            <div class="k" style="margin-bottom:6px;">对话明细（左：会话 · 右：该会话内各轮）</div>
+            <div id="user360Split" class="user360-chat-split">
+              <div class="user360-conv-list" id="user360ConvList"></div>
+              <div class="user360-turns" id="user360Turns"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分享裂变 -->
+    <div id="shares" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">分享裂变</h3>
+      <div class="err" id="errShare"></div>
+      <div class="mini-cards" id="shareSummaryCards"></div>
+      <div class="k" style="margin-bottom:6px;">转化漏斗</div>
+      <table id="shareFunnelTable">
+        <thead><tr><th>阶段</th><th>数量</th><th>占比 %</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="k" style="margin:14px 0 6px;">按日趋势</div>
+      <div class="chart-wrap">
+        <canvas id="shareDailyChart" aria-label="分享按日趋势"></canvas>
+      </div>
+
+      <div style="margin-top: 20px; border-top: 1px solid #1f2a44; padding-top: 16px;">
+        <h3 class="panel-title" style="margin-bottom: 10px;">分享列表（人 / 链 / 访问 / 访客 / 邮箱 / 对话）</h3>
+        <div class="row">
+          <input id="shareListKw" type="text" placeholder="筛选：分享人邮箱或短码" style="min-width:220px;flex:1;" />
+          <button type="button" id="queryShareListBtn">查询</button>
+        </div>
+        <div class="err" id="errShareList"></div>
+        <div class="muted" id="shareListMeta" style="margin:6px 0;"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>分享人</th>
+              <th>短链 ref</th>
+              <th>访问次数</th>
+              <th>独立访客</th>
+              <th>带来邮箱</th>
+              <th>访客与对话</th>
+            </tr>
+          </thead>
+          <tbody id="shareListTbody"></tbody>
+        </table>
+        <div class="row" style="margin-top:10px;">
+          <button type="button" id="shareListPrev">上一页</button>
+          <button type="button" id="shareListNext">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对话与模型 -->
+    <div id="conversations" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">对话与模型统计</h3>
+      <div class="row" style="flex-wrap:wrap; margin-bottom: 14px;">
+        <span class="muted">统计天数</span>
+        <select id="modelUsageDays" style="padding:6px 10px;">
+          <option value="14">14 天</option>
+          <option value="30" selected>30 天</option>
+          <option value="90">90 天</option>
+        </select>
+      </div>
+      <div class="err" id="errModelUsage"></div>
+      <table style="margin-bottom:12px;">
+        <thead>
+          <tr><th>模型</th><th>路由</th><th>回复数</th><th>图片回复</th><th>用户数</th><th>会话数</th><th>最近出现</th></tr>
+        </thead>
+        <tbody id="modelUsageTbody"></tbody>
+      </table>
+
+      <div style="margin-top: 20px; border-top: 1px solid #1f2a44; padding-top: 16px;">
+        <h3 class="panel-title" style="margin-bottom: 10px;">模型回复记录（含用户提问）</h3>
+        <div class="row">
+          <input id="modelRepliesKw" type="text" placeholder="筛选：会话ID / 用户问题 / 模型回答" style="min-width:220px;flex:1;" />
+          <input id="modelRepliesModel" type="text" placeholder="按模型ID筛选（可选）" style="min-width:160px;" />
+          <button type="button" id="queryModelRepliesBtn">查询</button>
+        </div>
+        <div class="muted" id="modelRepliesMeta" style="margin:6px 0;"></div>
+        <p class="muted" style="margin:0 0 8px;">每条记录默认折叠，摘要含<strong style="color:#c4b5fd;">提问用户</strong>（邮箱或匿名标识），点击展开完整「用户提问 / 模型回答」。</p>
+        <table>
+          <thead>
+            <tr><th colspan="5">模型回复记录（摘要 · 点击展开）</th></tr>
+          </thead>
+          <tbody id="modelRepliesTbody"></tbody>
+        </table>
+        <div class="row" style="margin-top:10px;">
+          <button type="button" id="modelRepliesPrev">上一页</button>
+          <button type="button" id="modelRepliesNext">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 链接明细 -->
+    <div id="links" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">链接网站 / 商品链接输入明细</h3>
+      <div class="row">
+        <input id="urlInputsKw" type="text" placeholder="筛选：链接、邮箱或用户ID" style="min-width:240px;flex:1;" />
+        <button type="button" id="queryUrlInputsBtn">查询</button>
+      </div>
+      <div class="err" id="errUrlInputs"></div>
+      <div class="muted" id="urlInputsMeta" style="margin:6px 0;"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>商品链接</th>
+            <th>输入人（邮箱/ID）</th>
+            <th>出现次数</th>
+            <th>首次出现</th>
+            <th>最近出现</th>
+            <th>快照来源</th>
+          </tr>
+        </thead>
+        <tbody id="urlInputsTbody"></tbody>
+      </table>
+      <div class="row" style="margin-top:10px;">
+        <button type="button" id="urlInputsPrev">上一页</button>
+        <button type="button" id="urlInputsNext">下一页</button>
+      </div>
+    </div>
+
+    <!-- 询盘管理 -->
+    <div id="inquiries" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">询盘管理</h3>
+      <div class="row" style="flex-wrap:wrap;">
+        <select id="inquiryStatusFilter" style="padding:6px 10px;">
+          <option value="">全部状态</option>
+          <option value="submitted">已提交</option>
+          <option value="replied">已回复</option>
+        </select>
+        <input id="inquiryKw" type="text" placeholder="筛选：邮箱 / WhatsApp / 需求" style="min-width:220px;flex:1;" />
+        <button type="button" id="queryInquiriesBtn">查询</button>
+      </div>
+      <div class="err" id="errInquiries"></div>
+      <div class="muted" id="inquiriesMeta" style="margin:6px 0;"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>用户</th>
+            <th>WhatsApp</th>
+            <th>商品</th>
+            <th>商品链接</th>
+            <th>需求</th>
+            <th>状态</th>
+            <th>提交时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="inquiriesTbody"></tbody>
+      </table>
+      <div class="row" style="margin-top:10px;">
+        <button type="button" id="inquiriesPrev">上一页</button>
+        <button type="button" id="inquiriesNext">下一页</button>
+      </div>
+    </div>
+
+    <!-- 自然语言查询 -->
+    <div id="nlq" class="panel" style="scroll-margin-top: 20px;">
+      <h3 class="panel-title">自然语言查询</h3>
+      <div class="nlq-presets" id="nlqPresets"></div>
+      <div class="row" style="align-items:flex-start;">
+        <textarea id="nlqInput" rows="3" placeholder="请输入你要查询的数据问题"></textarea>
+      </div>
+      <div class="row">
+        <button type="button" id="nlqRunBtn">发送</button>
+        <button type="button" id="nlqResetBtn" style="background:#475569;">新建会话</button>
+      </div>
+      <div class="err" id="errNlq"></div>
+      <div class="nlq-chat" id="nlqChat"></div>
+    </div>
+
+    <!-- 回复询盘弹窗 -->
+    <div id="inquiryReplyOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+      <div style="background:#11182d;border:1px solid #1f2a44;border-radius:14px;padding:20px 24px;max-width:520px;width:92%;">
+        <h3 style="margin:0 0 10px;font-size:16px;color:#e2e8f0;">回复询盘</h3>
+        <div class="muted" id="replyInquiryInfo" style="margin-bottom:10px;line-height:1.5;"></div>
+        <textarea id="replyContentInput" rows="4" placeholder="请输入回复内容…" style="width:100%;margin-bottom:10px;"></textarea>
+        <div class="err" id="errReply"></div>
+        <div class="row" style="justify-content:flex-end;gap:8px;">
+          <button type="button" id="replyCancel" style="background:#475569;">取消</button>
+          <button type="button" id="replySendBtn">发送回复</button>
+        </div>
+      </div>
+    </div>
+
+      </main>
+    </div>
+  </div>
+
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <h3 class="login-title">管理员登录</h3>
+      <input id="loginUsername" type="text" placeholder="用户名（如：admin-1）" autocomplete="username" />
+      <input id="loginPassword" type="password" placeholder="密码" autocomplete="current-password" />
+      <label class="login-remember"><input id="loginRemember" type="checkbox" /> 记住密码（保持登录 30 天）</label>
+      <div class="row" style="margin:0;">
+        <button id="loginBtn" type="button">登录</button>
+      </div>
+      <div class="err" id="errLogin" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const fmt = (v) => (v == null ? '-' : String(v));
+    function fmtCst(raw) {
+      if (!raw) return '';
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return String(raw);
+      return new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }).format(d);
+    }
+    function truncateOneLine(s, max) {
+      const t = String(s || '').replace(/\s+/g, ' ').trim();
+      if (t.length <= max) return t;
+      return `${t.slice(0, max)}…`;
+    }
+
+    function resolveInquiryLink(snap) {
+      const s = snap && typeof snap === 'object' ? snap : {};
+      const candidates = [s.tangbuyUrl, s.url, s.image, s.imageFallback];
+      for (const c of candidates) {
+        const x = String(c || '').trim();
+        if (/^https?:\/\//i.test(x)) return x;
+      }
+      return '';
+    }
+
+    function formatModelReplyUser(r) {
+      const em = String(r.user_email || '').trim();
+      if (em) return em;
+      const uid = String(r.user_id || '');
+      const tail = uid.length > 10 ? `${uid.slice(0, 8)}…` : uid || '—';
+      if (r.user_is_anonymous) return `匿名访客 · ${tail}`;
+      return uid ? `用户 · ${tail}` : '—';
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function copyToClipboard(text) {
+      const s = String(text || '');
+      if (!s) return;
+      const run = () => {
+        const ta = document.createElement('textarea');
+        ta.value = s;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } catch (_) {}
+        document.body.removeChild(ta);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(s).catch(run);
+      } else run();
+    }
+
+    const user360State = { data: null, convIdx: 0 };
+    let currentAdminUser = '';
+
+    function setLoginUi(loggedIn, username) {
+      const who = String(username || '').trim();
+      currentAdminUser = loggedIn ? who : '';
+      el('authUserText').textContent = loggedIn ? `已登录：${who}` : '未登录';
+      el('logoutBtn').style.display = loggedIn ? '' : 'none';
+      el('loginOverlay').style.display = loggedIn ? 'none' : 'flex';
+      document.body.classList.toggle('app-locked', !loggedIn);
+    }
+
+    function renderUser360Conversations() {
+      const d = user360State.data;
+      if (!d) return;
+      const convs = d.conversations || [];
+      const idx = convs.length === 0 ? 0 : Math.min(user360State.convIdx || 0, convs.length - 1);
+      user360State.convIdx = idx;
+      el('user360ConvList').innerHTML =
+        convs.length === 0
+          ? '<div class="muted" style="padding:12px;">暂无对话日志</div>'
+          : convs
+              .map(
+                (c, i) => `
+        <div class="user360-conv-item ${i === idx ? 'active' : ''}" data-idx="${i}">
+          <div style="font-size:12px;font-weight:600;color:#dbeafe;word-break:break-all;">${escapeHtml(c.conversation_id)}</div>
+          <div class="muted" style="font-size:11px;">${c.turn_count} 条 · 最近 ${fmtCst(c.last_at)}</div>
+        </div>`,
+              )
+              .join('');
+      const cur = convs[idx];
+      el('user360Turns').innerHTML = !cur
+        ? ''
+        : cur.turns
+            .map((t) => {
+              let urls = '';
+              try {
+                const u = t.extracted_urls;
+                if (u != null && (Array.isArray(u) ? u.length : Object.keys(u).length)) {
+                  urls = `<div class="muted" style="margin-top:6px;font-size:11px;word-break:break-all;">URLs: ${escapeHtml(typeof u === 'string' ? u : JSON.stringify(u))}</div>`;
+                }
+              } catch (_) {}
+              return `
+        <div style="border-bottom:1px solid #1f2a44;padding:10px 0;">
+          <div class="muted" style="font-size:11px;">${fmtCst(t.created_at)} · #${fmt(t.id)}</div>
+          <div style="margin-top:6px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(t.content_preview || '')}</div>
+          ${urls}
+        </div>`;
+            })
+            .join('');
+    }
+
+    function renderUser360(d) {
+      user360State.data = d;
+      user360State.convIdx = 0;
+      const p = d.profile;
+      el('user360Summary').innerHTML = `
+        <div class="card" style="margin-bottom:10px;">
+          <div class="k">用户 ID</div>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+            <code style="font-size:12px;word-break:break-all;flex:1;line-height:1.4;">${escapeHtml(p.id)}</code>
+            <button type="button" class="btn-mini" data-copy="${escapeHtml(p.id)}">复制</button>
+          </div>
+          <div style="margin-top:12px;font-size:13px;line-height:1.55;">
+            <div><span class="muted">邮箱</span> ${escapeHtml(p.email || '（无，可能为匿名访客）')}</div>
+            <div><span class="muted">是否匿名</span> ${p.is_anonymous ? '是' : '否'} &nbsp; <span class="muted">登录方式</span> ${escapeHtml(p.provider || '—')}</div>
+            <div><span class="muted">注册时间</span> ${fmtCst(p.created_at)}</div>
+            <div><span class="muted">最近登录</span> ${fmtCst(p.last_sign_in_at)}</div>
+          </div>
+        </div>
+        <div class="mini-cards">
+          <div class="card"><div class="k">VIP</div><div class="v" style="font-size:20px;">${d.stats && d.stats.is_vip ? '是' : '否'}</div></div>
+          <div class="card"><div class="k">对话条数</div><div class="v" style="font-size:20px;">${fmt(d.prompt_log_count)}</div></div>
+          <div class="card"><div class="k">会话数</div><div class="v" style="font-size:20px;">${fmt(d.conversation_count)}</div></div>
+          <div class="card"><div class="k">免费已用</div><div class="v" style="font-size:18px;">${d.stats ? fmt(d.stats.free_quota_used) : '—'}</div></div>
+        </div>`;
+
+      const sh = d.share || {};
+      const vs = sh.visit_stats || {};
+      const inq = d.inquiries || [];
+      el('user360ShareInq').innerHTML = `
+        <div class="card" style="margin-bottom:10px;">
+          <div class="k" style="margin-bottom:8px;">分享 / 归因</div>
+          <div style="font-size:13px;line-height:1.5;">
+            <div>${sh.has_share_link ? '已生成专属短链' : '尚未生成分享短链'}</div>
+            ${
+              (sh.links || [])
+                .map(
+                  (l) =>
+                    `<div class="muted" style="margin-top:4px;">ref=<strong style="color:#7fe7ff;">${escapeHtml(l.short_code || '')}</strong> · 创建 ${fmtCst(l.created_at)}</div>`,
+                )
+                .join('') || ''
+            }
+            <div style="margin-top:8px;">链上访问 <strong>${fmt(vs.total_visits)}</strong> 次；独立访客（按拉取样） <strong>${fmt(vs.distinct_visitors)}</strong>${vs.distinct_truncated ? '（样本截断，近似）' : ''}</div>
+            <div class="muted" style="font-size:12px;margin-top:4px;">其中匿名访问行 ${fmt(vs.anonymous_visit_rows)} · 带邮箱身份行 ${fmt(vs.email_identified_visit_rows)}</div>
+            ${sh.visits_truncated ? '<div class="muted" style="font-size:11px;margin-top:6px;">访问明细仅抽样展示前若干条。</div>' : ''}
+          </div>
+          <details style="margin-top:10px;">
+            <summary class="muted" style="cursor:pointer;">OAuth 归因（作为分享者带来的注册用户）</summary>
+            <div style="margin-top:8px;font-size:12px;">
+              ${
+                (sh.oauth_as_sharer || []).length === 0
+                  ? '<span class="muted">无</span>'
+                  : `<table style="font-size:12px;"><thead><tr><th>时间</th><th>归因邮箱</th><th>短码</th><th>provider</th></tr></thead><tbody>${(sh.oauth_as_sharer || [])
+                      .map(
+                        (o) =>
+                          `<tr><td>${fmtCst(o.created_at)}</td><td>${escapeHtml(o.visitor_email || '')}</td><td>${escapeHtml(o.short_code || '')}</td><td>${escapeHtml(o.oauth_provider || '')}</td></tr>`,
+                      )
+                      .join('')}</tbody></table>`
+              }
+            </div>
+          </details>
+          <details style="margin-top:8px;">
+            <summary class="muted" style="cursor:pointer;">OAuth 归因（本人通过他人分享注册）</summary>
+            <div style="margin-top:8px;font-size:12px;">
+              ${
+                (sh.oauth_as_attributed || []).length === 0
+                  ? '<span class="muted">无或未记录</span>'
+                  : `<table style="font-size:12px;"><thead><tr><th>时间</th><th>分享者邮箱</th><th>短码</th></tr></thead><tbody>${(sh.oauth_as_attributed || [])
+                      .map(
+                        (o) =>
+                          `<tr><td>${fmtCst(o.created_at)}</td><td>${escapeHtml(o.sharer_email || '')}</td><td>${escapeHtml(o.short_code || '')}</td></tr>`,
+                      )
+                      .join('')}</tbody></table>`
+              }
+            </div>
+          </details>
+        </div>
+        <div class="card">
+          <div class="k" style="margin-bottom:8px;">询盘（${inq.length}）</div>
+          ${
+            inq.length === 0
+              ? '<span class="muted">无询盘记录</span>'
+              : inq
+                  .map((x) => {
+                    const snap = x.product_snapshot;
+                    let title = '';
+                    try {
+                      if (snap && typeof snap === 'object') title = snap.title || snap.name || '';
+                    } catch (_) {}
+                    return `<div class="inq-mini">
+              <div><span class="muted">${fmtCst(x.created_at)}</span> · <strong>${escapeHtml(x.status || '')}</strong></div>
+              <div class="muted" style="font-size:11px;">${escapeHtml(x.user_email || '')} · WhatsApp ${escapeHtml(x.whatsapp || '')}</div>
+              ${title ? `<div style="margin-top:4px;">商品：${escapeHtml(String(title))}</div>` : ''}
+              <div style="margin-top:6px;">${escapeHtml(x.demand || '')}</div>
+            </div>`;
+                  })
+                  .join('')
+          }
+        </div>`;
+
+      el('user360Result').style.display = '';
+      renderUser360Conversations();
+    }
+
+    async function loadUser360() {
+      el('errUser360').textContent = '';
+      el('user360Candidates').innerHTML = '';
+      const q = el('user360Q').value.trim();
+      if (!q) {
+        el('errUser360').textContent = '请输入邮箱或 UUID';
+        return;
+      }
+      let r;
+      try {
+        r = await fetch(`/admin/api/user-360?q=${encodeURIComponent(q)}`);
+      } catch (e) {
+        el('errUser360').textContent = e?.message || String(e);
+        return;
+      }
+      const text = await r.text();
+      let j;
+      try {
+        j = text ? JSON.parse(text) : {};
+      } catch {
+        el('errUser360').textContent = '响应不是 JSON';
+        return;
+      }
+      if (r.status === 409 && j.candidates) {
+        el('errUser360').textContent = j.error || '多条匹配';
+        el('user360Candidates').innerHTML = `
+          <div class="muted" style="margin-bottom:6px;">点击一行将该 UUID 填入查询框并执行查询：</div>
+          <table>
+            <thead><tr><th>UUID</th><th>邮箱</th><th>注册</th></tr></thead>
+            <tbody>
+              ${j.candidates
+                .map(
+                  (c) =>
+                    `<tr class="user360-pick" style="cursor:pointer" data-pick="${escapeHtml(c.id)}">
+                <td><code style="font-size:11px;">${escapeHtml(c.id)}</code></td>
+                <td>${escapeHtml(c.email || '—')}</td>
+                <td>${fmtCst(c.created_at)}</td>
+              </tr>`,
+                )
+                .join('')}
+            </tbody>
+          </table>`;
+        el('user360Result').style.display = 'none';
+        return;
+      }
+      if (!r.ok || !j.ok) {
+        el('errUser360').textContent = j.error || `HTTP ${r.status}`;
+        el('user360Result').style.display = 'none';
+        return;
+      }
+      renderUser360(j.data);
+    }
+
+    async function api(url) {
+      let r;
+      try {
+        r = await fetch(url);
+      } catch (e) {
+        throw new Error(e?.message || '网络请求失败（请确认本地后端已启动）');
+      }
+      const text = await r.text();
+      let j;
+      try {
+        j = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`HTTP ${r.status}，响应不是 JSON：${text.slice(0, 160)}`);
+      }
+      if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      return j.data;
+    }
+
+    async function apiPost(url, body) {
+      let r;
+      try {
+        r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body || {}),
+        });
+      } catch (e) {
+        throw new Error(e?.message || '网络请求失败（请确认本地后端已启动）');
+      }
+      const text = await r.text();
+      let j;
+      try {
+        j = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`HTTP ${r.status}，响应不是 JSON：${text.slice(0, 160)}`);
+      }
+      if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      return j.data;
+    }
+
+    async function loadOverview() {
+      el('errOverview').textContent = '';
+      const d = await api('/admin/api/overview');
+      el('mTotal').textContent = fmt(d.total_users);
+      el('mVip').textContent = fmt(d.vip_users);
+      el('mVipRatio').textContent = d.vip_ratio == null ? '-' : `${d.vip_ratio}%`;
+      el('m30d').textContent = fmt(d.new_users_30d);
+      el('mTodayNew').textContent = fmt(d.new_users_today);
+      el('mShareAttr').textContent = fmt(d.share_attributed_emails);
+      el('mAnonVisits').textContent = fmt(d.total_anon_visitors);
+      el('mTotalInq').textContent = fmt(d.total_inquiries);
+      el('mRepliedInq').textContent = fmt(d.replied_inquiries);
+      el('mTodayInq').textContent = fmt(d.inquiries_today);
+    }
+
+    async function loadUsers(page = 1) {
+      el('errUsers').textContent = '';
+      const kw = encodeURIComponent(el('kw').value || '');
+      const vipOnly = el('vipOnly').checked ? '1' : '0';
+      const d = await api(`/admin/api/users?page=${page}&pageSize=20&keyword=${kw}&vipOnly=${vipOnly}`);
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      el('usersTbody').innerHTML = rows.map((r) => `
+        <tr>
+          <td class="uid-cell"><code>${escapeHtml(r.id)}</code><br /><button type="button" class="btn-mini" data-copy="${escapeHtml(r.id)}">复制</button></td>
+          <td>${r.email || ''}</td>
+          <td>${r.is_vip ? 'Yes' : 'No'}</td>
+          <td>${fmtCst(r.created_at)}</td>
+          <td>${fmtCst(r.last_sign_in_at)}</td>
+        </tr>
+      `).join('');
+      const src = d._source === 'auth_admin_fallback' ? '（Auth API 回退）' : '';
+      el('usersMeta').textContent = `共 ${d.total || 0} 条，当前第 ${d.page || 1} 页 ${src}`;
+    }
+
+    let trendsChart = null;
+
+    function formatDayLabel(raw) {
+      if (raw == null) return '';
+      const s = String(raw);
+      if (s.length >= 10) return s.slice(5, 10);
+      return s;
+    }
+
+    function renderTrendsChart(rows) {
+      const arr = Array.isArray(rows) ? rows : [];
+      const labels = arr.map((r) => formatDayLabel(r.date));
+      const newUsers = arr.map((r) => Number(r.new_users) || 0);
+      const newVip = arr.map((r) => Number(r.new_vip_users) || 0);
+      const canvas = el('trendsChart');
+      if (trendsChart) {
+        trendsChart.destroy();
+        trendsChart = null;
+      }
+      trendsChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: '新增用户',
+              data: newUsers,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.12)',
+              fill: true,
+              tension: 0.25,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+            },
+            {
+              label: '新增 VIP（user_stats.updated_at 近似）',
+              data: newVip,
+              borderColor: '#c084fc',
+              backgroundColor: 'transparent',
+              tension: 0.25,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              labels: { color: '#9fb0d4', boxWidth: 12 },
+            },
+            tooltip: {
+              callbacks: {
+                title: (items) => {
+                  const i = items[0]?.dataIndex;
+                  if (i == null || !arr[i]) return '';
+                  return String(arr[i].date || labels[i]);
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#98a6c6', maxRotation: 45, minRotation: 0 },
+              grid: { color: 'rgba(31, 42, 68, 0.6)' },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#98a6c6' },
+              grid: { color: 'rgba(31, 42, 68, 0.6)' },
+            },
+          },
+        },
+      });
+    }
+
+    async function loadTrends() {
+      el('errTrends').textContent = '';
+      const days = el('trendDays').value || '30';
+      const d = await api(`/admin/api/trends?days=${encodeURIComponent(days)}`);
+      el('trendsJson').textContent = JSON.stringify(d, null, 2);
+      renderTrendsChart(d);
+    }
+
+    let convUsageChart = null;
+    let shareDailyChart = null;
+
+    function renderConvUsageChart(rows) {
+      const arr = Array.isArray(rows) ? rows : [];
+      const labels = arr.map((r) => formatDayLabel(r.date));
+      const prompts = arr.map((r) => Number(r.total_prompts) || 0);
+      const actives = arr.map((r) => Number(r.active_users) || 0);
+      const anonymousPrompts = arr.map((r) => Number(r.anonymous_prompts) || 0);
+      const canvas = el('convChart');
+      if (convUsageChart) {
+        convUsageChart.destroy();
+        convUsageChart = null;
+      }
+      convUsageChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: '对话条数',
+              data: prompts,
+              borderColor: '#22c55e',
+              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              fill: true,
+              tension: 0.25,
+              yAxisID: 'y',
+              pointRadius: 0,
+            },
+            {
+              label: '活跃用户数',
+              data: actives,
+              borderColor: '#f59e0b',
+              backgroundColor: 'transparent',
+              tension: 0.25,
+              yAxisID: 'y1',
+              pointRadius: 0,
+            },
+            {
+              label: '匿名访客对话',
+              data: anonymousPrompts,
+              borderColor: '#60a5fa',
+              backgroundColor: 'transparent',
+              tension: 0.25,
+              yAxisID: 'y',
+              pointRadius: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#9fb0d4', boxWidth: 12 } },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#98a6c6', maxRotation: 45 },
+              grid: { color: 'rgba(31, 42, 68, 0.6)' },
+            },
+            y: {
+              type: 'linear',
+              position: 'left',
+              beginAtZero: true,
+              ticks: { color: '#98a6c6' },
+              grid: { color: 'rgba(31, 42, 68, 0.6)' },
+            },
+            y1: {
+              type: 'linear',
+              position: 'right',
+              beginAtZero: true,
+              ticks: { color: '#98a6c6' },
+              grid: { drawOnChartArea: false },
+            },
+          },
+        },
+      });
+    }
+
+    function renderShareSummary(summary) {
+      const s = summary || {};
+      const items = [
+        ['分享链接', s.total_share_links],
+        ['累计访问', s.total_visits],
+        ['匿名访问', s.anonymous_visits],
+        ['授权访问', s.authorized_visits],
+        ['有过访问的链接', s.links_with_visits],
+        ['OAuth 归因次数', s.oauth_attributions],
+        ['归因独立用户', s.unique_referred_users],
+      ];
+      el('shareSummaryCards').innerHTML = items
+        .map(
+          ([k, v]) =>
+            `<div class="card"><div class="k">${k}</div><div class="v">${fmt(v)}</div></div>`,
+        )
+        .join('');
+    }
+
+    function renderShareFunnel(rows) {
+      const tbody = document.querySelector('#shareFunnelTable tbody');
+      tbody.innerHTML = (Array.isArray(rows) ? rows : [])
+        .map(
+          (r) => `
+        <tr>
+          <td>${escapeHtml(r.stage)}</td>
+          <td>${fmt(r.count)}</td>
+          <td>${r.percentage == null ? '—' : `${r.percentage}%`}</td>
+        </tr>`,
+        )
+        .join('');
+    }
+
+    function renderShareDailyChart(rows) {
+      const arr = Array.isArray(rows) ? rows : [];
+      const labels = arr.map((r) => formatDayLabel(r.date));
+      const visits = arr.map((r) => Number(r.visits) || 0);
+      const uniq = arr.map((r) => Number(r.unique_visitors) || 0);
+      const oauth = arr.map((r) => Number(r.oauth_signups) || 0);
+      const newLinks = arr.map((r) => Number(r.new_share_links) || 0);
+      const anonymousVisits = arr.map((r) => Number(r.anonymous_visits) || 0);
+      const canvas = el('shareDailyChart');
+      if (shareDailyChart) {
+        shareDailyChart.destroy();
+        shareDailyChart = null;
+      }
+      shareDailyChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: '访问次数', data: visits, borderColor: '#38bdf8', tension: 0.25, pointRadius: 0 },
+            { label: '匿名访问', data: anonymousVisits, borderColor: '#60a5fa', tension: 0.25, pointRadius: 0 },
+            { label: '独立访客', data: uniq, borderColor: '#a78bfa', tension: 0.25, pointRadius: 0 },
+            { label: 'OAuth 归因', data: oauth, borderColor: '#f472b6', tension: 0.25, pointRadius: 0 },
+            { label: '新建分享链', data: newLinks, borderColor: '#94a3b8', tension: 0.25, pointRadius: 0 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#9fb0d4', boxWidth: 12 } },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#98a6c6', maxRotation: 45 },
+              grid: { color: 'rgba(31, 42, 68, 0.6)' },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#98a6c6' },
+              grid: { color: 'rgba(31, 42, 68, 0.6)' },
+            },
+          },
+        },
+      });
+    }
+
+    async function loadConversationUsage() {
+      el('errConv').textContent = '';
+      const days = el('usageDays').value || '30';
+      const d = await api(`/admin/api/conversation-usage?days=${encodeURIComponent(days)}`);
+      renderConvUsageChart(d);
+    }
+
+    async function loadShareInsights() {
+      el('errShare').textContent = '';
+      const days = el('usageDays').value || '30';
+      const d = await api(`/admin/api/share-insights?days=${encodeURIComponent(days)}`);
+      renderShareSummary(d.summary);
+      renderShareFunnel(d.funnel);
+      renderShareDailyChart(d.daily);
+    }
+
+    let shareListPage = 1;
+    let shareListKeyword = '';
+    const shareListPageSize = 15;
+
+    function normalizeShareListRows(raw) {
+      if (Array.isArray(raw)) return raw;
+      if (raw == null) return [];
+      if (typeof raw === 'string') {
+        try {
+          const p = JSON.parse(raw);
+          return Array.isArray(p) ? p : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
+
+    function renderShareVisitorBlock(visitors) {
+      const arr = Array.isArray(visitors) ? visitors : [];
+      if (arr.length === 0) return '<span class="muted">无访客记录</span>';
+      return `<details><summary>展开 ${arr.length} 个访客</summary>
+        <div style="margin-top:8px;font-size:12px;">
+          ${arr
+            .map((v) => {
+              const previews = Array.isArray(v.prompt_previews) ? v.prompt_previews : [];
+              const ul = previews
+                .map((p) => `<li>${escapeHtml(String(p))}</li>`)
+                .join('');
+              const uid = v.visitor_user_id != null ? String(v.visitor_user_id) : '';
+              const em = v.resolved_email ? escapeHtml(v.resolved_email) : '';
+              return `<div style="margin-bottom:10px;border-bottom:1px solid #1f2a44;padding-bottom:6px;">
+            <div title="${escapeHtml(uid)}"><span class="muted">访客</span> ${escapeHtml(uid.slice(0, 8))}…
+            ${
+              em
+                ? `<span class="muted"> 邮箱</span> ${em}`
+                : ' <span class="muted">（未绑定邮箱）</span>'
+            }</div>
+            <ul style="margin:4px 0;padding-left:18px;">${ul || '<li class="muted">无对话记录</li>'}</ul>
+          </div>`;
+            })
+            .join('')}
+        </div></details>`;
+    }
+
+    async function loadShareList(page) {
+      el('errShareList').textContent = '';
+      shareListKeyword = (el('shareListKw').value || '').trim();
+      shareListPage = Math.max(1, page || 1);
+      const qs = new URLSearchParams({
+        keyword: shareListKeyword,
+        page: String(shareListPage),
+        pageSize: String(shareListPageSize),
+      });
+      const d = await api(`/admin/api/share-list?${qs.toString()}`);
+      const rows = normalizeShareListRows(d.rows);
+      const total = Number(d.total) || 0;
+      const ps = Number(d.page_size) || shareListPageSize;
+      const maxPage = Math.max(1, Math.ceil(total / ps) || 1);
+      el('shareListTbody').innerHTML = rows
+        .map((r) => {
+          const emails = Array.isArray(r.brought_emails) ? r.brought_emails : [];
+          const emailStr = emails.map((e) => escapeHtml(String(e))).join('、') || '—';
+          return `<tr>
+          <td>${escapeHtml(r.sharer_email)}</td>
+          <td><code>${escapeHtml(r.short_code)}</code> <span class="muted">${escapeHtml(r.ref_param || '')}</span></td>
+          <td>${fmt(r.visit_count)}</td>
+          <td>${fmt(r.unique_visitors)}</td>
+          <td style="max-width:200px;white-space:normal;">${emailStr}</td>
+          <td style="max-width:360px;vertical-align:top;">${renderShareVisitorBlock(r.visitors)}</td>
+        </tr>`;
+        })
+        .join('');
+      el('shareListMeta').textContent = `共 ${total} 条分享链 · 第 ${shareListPage} / ${maxPage} 页`;
+    }
+
+    let urlInputsPage = 1;
+    let urlInputsKeyword = '';
+    const urlInputsPageSize = 20;
+
+    async function loadUrlInputs(page) {
+      el('errUrlInputs').textContent = '';
+      urlInputsKeyword = (el('urlInputsKw').value || '').trim();
+      urlInputsPage = Math.max(1, page || 1);
+      const qs = new URLSearchParams({
+        keyword: urlInputsKeyword,
+        page: String(urlInputsPage),
+        pageSize: String(urlInputsPageSize),
+      });
+      const d = await api(`/admin/api/url-inputs?${qs.toString()}`);
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      const total = Number(d.total) || 0;
+      const ps = Number(d.page_size) || urlInputsPageSize;
+      const maxPage = Math.max(1, Math.ceil(total / ps) || 1);
+      el('urlInputsTbody').innerHTML = rows
+        .map((r) => {
+          const url = r.product_url ? String(r.product_url) : '';
+          const idt = r.user_identity ? String(r.user_identity) : String(r.user_id || '');
+          const first = fmtCst(r.first_seen_at);
+          const last = fmtCst(r.last_seen_at);
+          // 快照来源: jina / trickle / null
+          const source = r.snapshot_source ? String(r.snapshot_source).toLowerCase() : '';
+          const sourceBadge = source === 'jina' 
+            ? '<span style="color:#10b981;font-weight:600;">Jina</span>'
+            : source === 'trickle' 
+              ? '<span style="color:#f59e0b;font-weight:600;">Trickle</span>'
+              : '<span style="color:#6b7280;">-</span>';
+          return `<tr>
+            <td style="max-width:360px;word-break:break-all;"><a class="url-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a></td>
+            <td title="${escapeHtml(String(r.user_id || ''))}">${escapeHtml(idt)}</td>
+            <td>${fmt(r.mentioned_times)}</td>
+            <td>${escapeHtml(first)}</td>
+            <td>${escapeHtml(last)}</td>
+            <td>${sourceBadge}</td>
+          </tr>`;
+        })
+        .join('');
+      el('urlInputsMeta').textContent = `共 ${total} 条记录 · 第 ${urlInputsPage} / ${maxPage} 页`;
+    }
+
+    let promptLogsPage = 1;
+    let promptLogsEmail = '';
+
+    async function loadPromptLogs(page) {
+      el('errPrompts').textContent = '';
+      const email = (el('promptEmail').value || '').trim();
+      if (!email) {
+        el('errPrompts').textContent = '请输入邮箱或关键词';
+        return;
+      }
+      promptLogsEmail = email;
+      promptLogsPage = Math.max(1, page || 1);
+      const qs = new URLSearchParams({
+        email: promptLogsEmail,
+        page: String(promptLogsPage),
+        pageSize: '20',
+      });
+      const d = await api(`/admin/api/prompt-logs?${qs.toString()}`);
+      if (d.error) {
+        el('errPrompts').textContent = d.message || d.error;
+        el('promptsTbody').innerHTML = '';
+        el('promptsMeta').textContent = '';
+        return;
+      }
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      el('promptsTbody').innerHTML = rows
+        .map((r) => {
+          const urls = r.extracted_urls != null ? JSON.stringify(r.extracted_urls) : '';
+          const shortUrls = urls.length > 90 ? `${urls.slice(0, 90)}…` : urls;
+          const t = fmtCst(r.created_at);
+          return `<tr>
+          <td>${escapeHtml(t)}</td>
+          <td>${escapeHtml(r.email)}</td>
+          <td>${escapeHtml(r.conversation_id)}</td>
+          <td class="preview-cell" title="${escapeHtml(r.content_preview)}">${escapeHtml(r.content_preview)}</td>
+          <td class="urls-cell" title="${escapeHtml(urls)}">${escapeHtml(shortUrls)}</td>
+        </tr>`;
+        })
+        .join('');
+      const matched = Array.isArray(d.matched_emails) ? d.matched_emails.length : d.matched_user_count || 0;
+      el('promptsMeta').textContent = `匹配用户 ${matched} 个 · 明细共 ${d.total || 0} 条 · 第 ${d.page || 1} 页`;
+    }
+
+    let modelRepliesPage = 1;
+    let modelRepliesKeyword = '';
+    let modelRepliesModelId = '';
+    const modelRepliesPageSize = 20;
+
+    async function loadModelUsage() {
+      el('errModelUsage').textContent = '';
+      const days = el('modelUsageDays').value || '30';
+      const d = await api(`/admin/api/model-usage?days=${encodeURIComponent(days)}`);
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      el('modelUsageTbody').innerHTML = rows.map((r) => `
+        <tr>
+          <td>${escapeHtml(r.model_id || '')}</td>
+          <td>${escapeHtml(r.model_route || '')}</td>
+          <td>${fmt(r.total_replies)}</td>
+          <td>${fmt(r.image_replies)}</td>
+          <td>${fmt(r.distinct_users)}</td>
+          <td>${fmt(r.distinct_conversations)}</td>
+          <td>${escapeHtml(fmtCst(r.last_seen_at))}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadModelReplies(page) {
+      el('errModelUsage').textContent = '';
+      modelRepliesKeyword = (el('modelRepliesKw').value || '').trim();
+      modelRepliesModelId = (el('modelRepliesModel').value || '').trim();
+      modelRepliesPage = Math.max(1, page || 1);
+      const days = el('modelUsageDays').value || '30';
+      const qs = new URLSearchParams({
+        page: String(modelRepliesPage),
+        pageSize: String(modelRepliesPageSize),
+        days: String(days),
+        keyword: modelRepliesKeyword,
+        modelId: modelRepliesModelId,
+      });
+      const d = await api(`/admin/api/model-replies?${qs.toString()}`);
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      const total = Number(d.total) || 0;
+      const ps = Number(d.page_size) || modelRepliesPageSize;
+      const maxPage = Math.max(1, Math.ceil(total / ps) || 1);
+      el('modelRepliesTbody').innerHTML = rows
+        .map((r) => {
+          const userQ = r.user_prompt_preview || '';
+          const asst = r.assistant_reply_preview || '';
+          const peek = truncateOneLine(userQ, 72) || truncateOneLine(asst, 72) || '（无预览）';
+          const modelLine = `${r.model_id || ''}${r.model_route ? ` · ${r.model_route}` : ''}${r.has_image ? ' · image' : ''}`;
+          const who = formatModelReplyUser(r);
+          const whoTitle = [who, r.user_id ? `id:${r.user_id}` : ''].filter(Boolean).join(' · ');
+          return `<tr>
+        <td colspan="5" style="padding:4px 0;border-bottom:none;vertical-align:top;">
+          <details class="model-reply-details">
+            <summary>
+              <span class="model-reply-sum-time">${escapeHtml(fmtCst(r.created_at))}</span>
+              <span class="model-reply-sum-user" title="${escapeHtml(whoTitle)}">${escapeHtml(who)}</span>
+              <span class="model-reply-sum-model" title="${escapeHtml(r.model_id || '')}">${escapeHtml(modelLine)}</span>
+              <span class="model-reply-sum-conv"><code>${escapeHtml(r.conversation_id || '')}</code></span>
+              <span class="model-reply-sum-peek" title="${escapeHtml(userQ || asst)}">${escapeHtml(peek)}</span>
+            </summary>
+            <div class="model-reply-body">
+              <div class="model-reply-block">
+                <div class="lbl">提问用户</div>
+                <div class="body">${escapeHtml(who)}${r.user_id ? `<span class="muted" style="display:block;margin-top:6px;font-size:11px;word-break:break-all;">user_id: ${escapeHtml(r.user_id)}</span>` : ''}</div>
+              </div>
+              <div class="model-reply-block">
+                <div class="lbl">用户问了什么</div>
+                <div class="body">${escapeHtml(userQ) || '<span class="muted">—</span>'}</div>
+              </div>
+              <div class="model-reply-block">
+                <div class="lbl">模型怎么回答</div>
+                <div class="body">${escapeHtml(asst) || '<span class="muted">—</span>'}</div>
+              </div>
+            </div>
+          </details>
+        </td>
+      </tr>`;
+        })
+        .join('');
+      el('modelRepliesMeta').textContent = `共 ${total} 条模型回复记录 · 第 ${modelRepliesPage} / ${maxPage} 页`;
+    }
+
+    let nlqSessionId = '';
+    const nlqPresets = [
+      '今日注册用户数和注册邮箱分别是什么？',
+      '使用对话最多的用户是谁，使用了多少次，平均每日使用次数是多少？',
+      '昨天注册用户数是多少？',
+      '最近7天每天注册用户数分别是多少？',
+    ];
+
+    function renderNlqPresets() {
+      el('nlqPresets').innerHTML = nlqPresets
+        .map((q) => `<button type="button" class="nlq-preset-btn" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`)
+        .join('');
+      Array.from(document.querySelectorAll('.nlq-preset-btn')).forEach((btn) => {
+        btn.addEventListener('click', () => {
+          el('nlqInput').value = btn.getAttribute('data-q') || '';
+          el('nlqInput').focus();
+        });
+      });
+    }
+
+    function rowToLine(row) {
+      if (row == null) return '';
+      if (typeof row !== 'object' || Array.isArray(row)) return String(row);
+      return Object.values(row)
+        .map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v)))
+        .join('  ');
+    }
+
+    function appendNlqChat(role, content) {
+      const cls = role === 'user' ? 'nlq-msg-user' : 'nlq-msg-ai';
+      let body = escapeHtml(content || '');
+      if (role === 'ai') body = renderAiMarkdown(content || '');
+      return `<div class="nlq-msg ${cls}">${body}</div>`;
+    }
+
+    function renderAiMarkdown(content) {
+      try {
+        const src = String(content || '')
+          .replace(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi, '**$1**');
+        const html = marked.parse(src);
+        let safe = DOMPurify.sanitize(html, { ALLOWED_ATTR: ['href', 'target', 'rel', 'class'] });
+        safe = safe.replace(/<strong>([^<]+)<\/strong>/g, '<strong class="nlq-hi-token">$1</strong>');
+        return safe;
+      } catch (_) {
+        return escapeHtml(content || '');
+      }
+    }
+
+    function nlqChatNearBottom(thresholdPx) {
+      const box = el('nlqChat');
+      const th = typeof thresholdPx === 'number' ? thresholdPx : 120;
+      return box.scrollHeight - box.scrollTop - box.clientHeight <= th;
+    }
+
+    function createNlqCard(question) {
+      const id = `nlq_card_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const html = `
+        <div class="nlq-card" id="${id}">
+          <div class="nlq-card-head">
+            <div class="nlq-card-q" title="${escapeHtml(question)}">${escapeHtml(question)}</div>
+            <div class="nlq-card-actions">
+              <button type="button" class="nlq-card-btn" data-action="toggle" data-id="${id}">折叠</button>
+              <button type="button" class="nlq-card-btn" data-action="delete" data-id="${id}">删除</button>
+            </div>
+          </div>
+          <div class="nlq-card-body nlq-card-body--loading">查询中...</div>
+        </div>`;
+      const box = el('nlqChat');
+      const stickToBottom = nlqChatNearBottom(120);
+      box.insertAdjacentHTML('beforeend', html);
+      if (stickToBottom) box.scrollTop = box.scrollHeight;
+      return id;
+    }
+
+    function setNlqCardBody(cardId, content) {
+      const root = document.getElementById(cardId);
+      if (!root) return;
+      const body = root.querySelector('.nlq-card-body');
+      if (!body) return;
+      const pinned = nlqChatNearBottom(120);
+      body.classList.remove('nlq-card-body--loading');
+      body.innerHTML = appendNlqChat('ai', content || '');
+      if (pinned) {
+        const box = el('nlqChat');
+        box.scrollTop = box.scrollHeight;
+      }
+    }
+
+    async function runNlq() {
+      el('errNlq').textContent = '';
+      const question = (el('nlqInput').value || '').trim();
+      if (!question) {
+        el('errNlq').textContent = '请输入自然语言指令';
+        return;
+      }
+      const cardId = createNlqCard(question);
+      try {
+        const d = await apiPost('/admin/api/nlq', { question, session_id: nlqSessionId || undefined });
+        nlqSessionId = d.session_id || nlqSessionId;
+        const rows = Array.isArray(d.rows) ? d.rows : [];
+        const lines = rows.map((r) => rowToLine(r)).filter(Boolean);
+        const output = d.answer_text || lines.join('\n') || `返回 ${d.row_count || 0} 行`;
+        setNlqCardBody(cardId, output || `返回 ${d.row_count || 0} 行`);
+        el('nlqInput').value = '';
+      } catch (e) {
+        setNlqCardBody(cardId, `查询失败：${e?.message || String(e)}`);
+        throw e;
+      } finally {
+      }
+    }
+
+    async function resetNlqContext() {
+      const d = await apiPost('/admin/api/nlq/context/reset', { session_id: nlqSessionId || undefined });
+      nlqSessionId = d.session_id || '';
+      el('nlqChat').innerHTML = '';
+    }
+
+    async function syncNlqSchema() {
+      await apiPost('/admin/api/nlq/schema/refresh', {});
+    }
+
+    // ── 询盘管理 ──
+    let inquiriesPage = 1;
+    let inquiriesKeyword = '';
+    let inquiriesStatus = '';
+    let currentReplyInquiryId = null;
+
+    async function loadInquiries(page = 1) {
+      el('errInquiries').textContent = '';
+      inquiriesPage = page;
+      inquiriesKeyword = el('inquiryKw').value.trim();
+      inquiriesStatus = el('inquiryStatusFilter').value;
+      const params = new URLSearchParams({ page, pageSize: 20 });
+      if (inquiriesStatus) params.set('status', inquiriesStatus);
+      if (inquiriesKeyword) params.set('keyword', inquiriesKeyword);
+      const d = await api(`/admin/api/inquiries?${params}`);
+      const rows = Array.isArray(d.rows) ? d.rows : [];
+      el('inquiriesMeta').textContent = `共 ${d.total || 0} 条，当前第 ${d.page || 1} 页`;
+      el('inquiriesTbody').innerHTML = rows.map((r) => {
+        const snap = r.product_snapshot || {};
+        const productName = truncateOneLine(snap.name || '—', 30);
+        const productLink = resolveInquiryLink(snap);
+        const shortLink = productLink ? truncateOneLine(productLink, 56) : '—';
+        const linkCell = productLink
+          ? `<a class="url-link" href="${escapeHtml(productLink)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(productLink)}">${escapeHtml(shortLink)}</a>`
+          : '<span class="muted">—</span>';
+        const statusLabel = r.status === 'replied' ? '<span style="color:#22c55e;">已回复</span>' : '<span style="color:#f59e0b;">已提交</span>';
+        const replyInfo = r.reply_content ? `<br><span style="font-size:11px;color:#94a3b8;">回复：${escapeHtml(truncateOneLine(r.reply_content, 40))}</span>` : '';
+        const actionBtn = r.status === 'submitted'
+          ? `<button type="button" class="inquiry-reply-btn" data-id="${r.id}" data-email="${escapeHtml(r.user_email || '')}" data-product="${escapeHtml(productName)}" data-demand="${escapeHtml(truncateOneLine(r.demand, 60))}" data-link="${escapeHtml(productLink)}" style="background:#3b82f6;color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">回复</button>`
+          : `<span class="muted" style="font-size:11px;">已处理</span>`;
+        return `<tr>
+          <td>${escapeHtml(r.user_email || r.user_id?.slice(0, 8) || '—')}</td>
+          <td>${escapeHtml(r.whatsapp || '—')}</td>
+          <td title="${escapeHtml(snap.name || '')}">${escapeHtml(productName)}</td>
+          <td style="max-width:280px;white-space:normal;word-break:break-all;line-height:1.4;">${linkCell}</td>
+          <td style="max-width:200px;white-space:normal;word-break:break-word;line-height:1.4;">${escapeHtml(truncateOneLine(r.demand, 60))}</td>
+          <td>${statusLabel}${replyInfo}</td>
+          <td>${fmtCst(r.created_at)}</td>
+          <td>${actionBtn}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function openReplyOverlay(inquiryId, info) {
+      currentReplyInquiryId = inquiryId;
+      el('replyInquiryInfo').innerHTML = info;
+      el('replyContentInput').value = '';
+      el('errReply').textContent = '';
+      const overlay = el('inquiryReplyOverlay');
+      overlay.style.display = 'flex';
+    }
+    function closeReplyOverlay() {
+      currentReplyInquiryId = null;
+      el('inquiryReplyOverlay').style.display = 'none';
+    }
+
+    async function sendInquiryReply() {
+      const content = el('replyContentInput').value.trim();
+      if (!content) { el('errReply').textContent = '请输入回复内容'; return; }
+      if (!currentReplyInquiryId) return;
+      el('errReply').textContent = '';
+      el('replySendBtn').disabled = true;
+      try {
+        await apiPost(`/admin/api/inquiries/${currentReplyInquiryId}/reply`, { reply_content: content });
+        closeReplyOverlay();
+        await loadInquiries(inquiriesPage);
+      } catch (e) {
+        el('errReply').textContent = e?.message || String(e);
+      } finally {
+        el('replySendBtn').disabled = false;
+      }
+    }
+
+    // 询盘表格点击回复按钮代理
+    el('inquiriesTbody').addEventListener('click', (ev) => {
+      const btn = ev.target?.closest?.('.inquiry-reply-btn');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      const email = btn.getAttribute('data-email') || '—';
+      const product = btn.getAttribute('data-product') || '—';
+      const demand = btn.getAttribute('data-demand') || '—';
+      const link = btn.getAttribute('data-link') || '';
+      const linkHtml = link
+        ? `商品链接：<a class="url-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(truncateOneLine(link, 72))}</a><br>`
+        : '';
+      openReplyOverlay(id, `用户：${escapeHtml(email)}<br>商品：${escapeHtml(product)}<br>${linkHtml}需求：${escapeHtml(demand)}`);
+    });
+    el('replyCancel').addEventListener('click', closeReplyOverlay);
+    el('replySendBtn').addEventListener('click', sendInquiryReply);
+    el('queryInquiriesBtn').addEventListener('click', async () => {
+      try { await loadInquiries(1); } catch (e) { el('errInquiries').textContent = e?.message || String(e); }
+    });
+    el('inquiriesPrev').addEventListener('click', async () => {
+      if (inquiriesPage <= 1) return;
+      try { await loadInquiries(inquiriesPage - 1); } catch (e) { el('errInquiries').textContent = e?.message || String(e); }
+    });
+    el('inquiriesNext').addEventListener('click', async () => {
+      try { await loadInquiries(inquiriesPage + 1); } catch (e) { el('errInquiries').textContent = e?.message || String(e); }
+    });
+
+    async function refreshAll() {
+      el('errOverview').textContent = '';
+      el('errUsers').textContent = '';
+      el('errTrends').textContent = '';
+      el('errConv').textContent = '';
+      el('errShare').textContent = '';
+      el('errShareList').textContent = '';
+      el('errUrlInputs').textContent = '';
+      el('errModelUsage').textContent = '';
+      el('errNlq').textContent = '';
+      el('errInquiries').textContent = '';
+      const results = await Promise.allSettled([
+        syncNlqSchema(),
+        loadOverview(),
+        loadUsers(1),
+        loadTrends(),
+        loadConversationUsage(),
+        loadShareInsights(),
+        loadShareList(1),
+        loadUrlInputs(1),
+        loadModelUsage(),
+        loadModelReplies(1),
+        loadInquiries(1),
+      ]);
+      const labels = ['NLQ结构同步', '总览', '用户列表', '趋势', '对话用量', '分享裂变', '分享列表', '链接网站维度', '模型使用统计', '模型回复记录', '询盘列表'];
+      const errIds = ['errNlq', 'errOverview', 'errUsers', 'errTrends', 'errConv', 'errShare', 'errShareList', 'errUrlInputs', 'errModelUsage', 'errModelUsage', 'errInquiries'];
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          el(errIds[i]).textContent = `${labels[i]} 拉取失败：${r.reason?.message || r.reason}`;
+        }
+      });
+    }
+
+    el('refreshBtn').addEventListener('click', refreshAll);
+    el('usageDays').addEventListener('change', async () => {
+      el('errConv').textContent = '';
+      el('errShare').textContent = '';
+      const results = await Promise.allSettled([loadConversationUsage(), loadShareInsights(), loadModelUsage(), loadModelReplies(1)]);
+      const errIds = ['errConv', 'errShare', 'errModelUsage', 'errModelUsage'];
+      const labels = ['对话用量', '分享裂变', '模型使用统计', '模型上下文列表'];
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          el(errIds[i]).textContent = `${labels[i]} 拉取失败：${r.reason?.message || r.reason}`;
+        }
+      });
+    });
+    el('trendDays').addEventListener('change', async () => {
+      try {
+        await loadTrends();
+      } catch (e) {
+        el('errTrends').textContent = e?.message || String(e);
+      }
+    });
+    el('queryUsersBtn').addEventListener('click', async () => {
+      try {
+        await loadUsers(1);
+      } catch (e) {
+        el('errUsers').textContent = e?.message || String(e);
+      }
+    });
+    el('user360Btn').addEventListener('click', async () => {
+      try {
+        await loadUser360();
+      } catch (e) {
+        el('errUser360').textContent = e?.message || String(e);
+      }
+    });
+    el('user360Split').addEventListener('click', (ev) => {
+      const item = ev.target.closest('.user360-conv-item');
+      if (!item) return;
+      const i = Number(item.getAttribute('data-idx'));
+      if (!Number.isFinite(i)) return;
+      user360State.convIdx = i;
+      renderUser360Conversations();
+    });
+    document.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-copy]');
+      if (!btn) return;
+      const raw = btn.getAttribute('data-copy');
+      if (raw) copyToClipboard(raw);
+    });
+    el('user360Candidates').addEventListener('click', (ev) => {
+      const tr = ev.target.closest('tr[data-pick]');
+      if (!tr) return;
+      const id = tr.getAttribute('data-pick');
+      if (!id) return;
+      el('user360Q').value = id;
+      loadUser360();
+    });
+    el('nlqRunBtn').addEventListener('click', async () => {
+      try {
+        await runNlq();
+      } catch (e) {
+        el('errNlq').textContent = e?.message || String(e);
+      }
+    });
+    el('nlqResetBtn').addEventListener('click', async () => {
+      try {
+        await resetNlqContext();
+      } catch (e) {
+        el('errNlq').textContent = e?.message || String(e);
+      }
+    });
+    el('nlqChat').addEventListener('click', (ev) => {
+      const btn = ev.target?.closest?.('.nlq-card-btn');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      const id = btn.getAttribute('data-id');
+      if (!id) return;
+      const card = document.getElementById(id);
+      if (!card) return;
+      if (action === 'delete') {
+        card.remove();
+        return;
+      }
+      if (action === 'toggle') {
+        const body = card.querySelector('.nlq-card-body');
+        if (!body) return;
+        const collapsed = body.style.display === 'none';
+        body.style.display = collapsed ? '' : 'none';
+        btn.textContent = collapsed ? '折叠' : '展开';
+      }
+    });
+    el('modelUsageDays').addEventListener('change', async () => {
+      try {
+        await Promise.all([loadModelUsage(), loadModelReplies(1)]);
+      } catch (e) {
+        el('errModelUsage').textContent = e?.message || String(e);
+      }
+    });
+    el('queryModelRepliesBtn').addEventListener('click', async () => {
+      try {
+        await loadModelReplies(1);
+      } catch (e) {
+        el('errModelUsage').textContent = e?.message || String(e);
+      }
+    });
+    el('modelRepliesPrev').addEventListener('click', async () => {
+      if (modelRepliesPage <= 1) return;
+      el('modelRepliesKw').value = modelRepliesKeyword;
+      el('modelRepliesModel').value = modelRepliesModelId;
+      try {
+        await loadModelReplies(modelRepliesPage - 1);
+      } catch (e) {
+        el('errModelUsage').textContent = e?.message || String(e);
+      }
+    });
+    el('modelRepliesNext').addEventListener('click', async () => {
+      el('modelRepliesKw').value = modelRepliesKeyword;
+      el('modelRepliesModel').value = modelRepliesModelId;
+      try {
+        await loadModelReplies(modelRepliesPage + 1);
+      } catch (e) {
+        el('errModelUsage').textContent = e?.message || String(e);
+      }
+    });
+    el('queryShareListBtn').addEventListener('click', async () => {
+      try {
+        await loadShareList(1);
+      } catch (e) {
+        el('errShareList').textContent = e?.message || String(e);
+      }
+    });
+    el('shareListPrev').addEventListener('click', async () => {
+      if (shareListPage <= 1) return;
+      el('shareListKw').value = shareListKeyword;
+      try {
+        await loadShareList(shareListPage - 1);
+      } catch (e) {
+        el('errShareList').textContent = e?.message || String(e);
+      }
+    });
+    el('shareListNext').addEventListener('click', async () => {
+      el('shareListKw').value = shareListKeyword;
+      try {
+        await loadShareList(shareListPage + 1);
+      } catch (e) {
+        el('errShareList').textContent = e?.message || String(e);
+      }
+    });
+    el('queryUrlInputsBtn').addEventListener('click', async () => {
+      try {
+        await loadUrlInputs(1);
+      } catch (e) {
+        el('errUrlInputs').textContent = e?.message || String(e);
+      }
+    });
+    el('urlInputsPrev').addEventListener('click', async () => {
+      if (urlInputsPage <= 1) return;
+      el('urlInputsKw').value = urlInputsKeyword;
+      try {
+        await loadUrlInputs(urlInputsPage - 1);
+      } catch (e) {
+        el('errUrlInputs').textContent = e?.message || String(e);
+      }
+    });
+    el('urlInputsNext').addEventListener('click', async () => {
+      el('urlInputsKw').value = urlInputsKeyword;
+      try {
+        await loadUrlInputs(urlInputsPage + 1);
+      } catch (e) {
+        el('errUrlInputs').textContent = e?.message || String(e);
+      }
+    });
+    // ── 侧边栏导航高亮与平滑滚动 ──
+    (function initSidebarNav() {
+      const nav = el('sidebarNav');
+      if (!nav) return;
+      const links = nav.querySelectorAll('a[href^="#"]');
+
+      // 点击平滑滚动并更新 active 状态
+      links.forEach((a) => {
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const targetId = a.getAttribute('href').slice(1);
+          const target = document.getElementById(targetId);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            history.replaceState(null, '', `#${targetId}`);
+          }
+          links.forEach((l) => l.classList.remove('active'));
+          a.classList.add('active');
+        });
+      });
+
+      // 滚动时自动高亮对应章节
+      const sections = Array.from(links).map((a) => {
+        const id = a.getAttribute('href').slice(1);
+        return { id, el: document.getElementById(id), a };
+      }).filter((s) => s.el);
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            links.forEach((l) => l.classList.remove('active'));
+            const sec = sections.find((s) => s.id === entry.target.id);
+            if (sec) sec.a.classList.add('active');
+          }
+        });
+      }, { rootMargin: '-20% 0px -60% 0px', threshold: 0 });
+
+      sections.forEach((s) => observer.observe(s.el));
+
+      // 初始高亮 hash 对应的章节
+      const initialHash = location.hash.slice(1);
+      if (initialHash) {
+        const sec = sections.find((s) => s.id === initialHash);
+        if (sec) {
+          sec.a.classList.add('active');
+          setTimeout(() => sec.el?.scrollIntoView({ block: 'start' }), 100);
+        }
+      }
+    })();
+
+    renderNlqPresets();
+    refreshAll();
+  </script>
+</body>
+</html>
