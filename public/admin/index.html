@@ -113,6 +113,7 @@
     .login-title { margin: 0 0 14px; font-size: 18px; color: #e2e8f0; }
     .login-card input[type="text"], .login-card input[type="password"] { width: 100%; box-sizing: border-box; margin-bottom: 10px; }
     .login-remember { display: flex; align-items: center; gap: 6px; margin: 4px 0 12px; font-size: 12px; color: #9fb0d4; }
+    .app-shell { display: none; }
     .app-shell.app-locked { filter: blur(1.5px); pointer-events: none; user-select: none; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -427,7 +428,7 @@
     </div>
   </div>
 
-  <div id="loginOverlay" class="login-overlay">
+  <div id="loginOverlay" class="login-overlay" style="display:flex;">
     <div class="login-card">
       <h3 class="login-title">管理员登录</h3>
       <input id="loginUsername" type="text" placeholder="用户名（如：admin-1）" autocomplete="username" />
@@ -569,6 +570,7 @@
       el('authUserText').textContent = loggedIn ? `已登录：${who}` : '未登录';
       el('logoutBtn').style.display = loggedIn ? '' : 'none';
       el('loginOverlay').style.display = loggedIn ? 'none' : 'flex';
+      el('appShell').style.display = loggedIn ? 'block' : 'none';
       el('appShell').classList.toggle('app-locked', !loggedIn);
     }
 
