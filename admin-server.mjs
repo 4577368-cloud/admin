@@ -22,7 +22,6 @@ const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(
 const llmBaseUrl = String(process.env.VLLM_BASE_URL || '').trim().replace(/\/+$/, '');
 const llmApiKey = String(process.env.VLLM_API_KEY || '').trim();
 const llmModelId = String(process.env.VLLM_MODEL_ID || '').trim();
-const ANALYTICS_START_AT_ISO = String(process.env.ADMIN_ANALYTICS_START_AT || '2026-04-14T00:00:00+08:00').trim();
 const INTERNAL_TEST_EMAILS = new Set([
   'liumengyu594@gmail.com',
   'service@tangbuy.net',
@@ -185,6 +184,10 @@ function normalizeEmail(email) {
 
 function isInternalTestEmail(email) {
   return INTERNAL_TEST_EMAILS.has(normalizeEmail(email));
+}
+
+function clampDays(inputDays) {
+  return Math.max(1, Math.min(365, Number(inputDays) || 30));
 }
 
 /** 随仓库打包的只读 schema；Vercel 上不可写盘，刷新时写入 /tmp（仅当次实例有效） */
@@ -903,8 +906,7 @@ async function mapUserIdsToAuthInfo(userIds) {
 
 async function buildOverviewFallback() {
   const users = await fetchAllAuthUsersForAdmin({
-    excludeInternal: true,
-    createdAtGteIso: ANALYTICS_START_AT_ISO,
+    excludeInternal: false,
   });
   const vipSet = await loadVipUserIdSet();
   const now = Date.now();
@@ -928,7 +930,6 @@ async function buildOverviewFallback() {
     const { data: anonData, error: anonErr } = await supabase
       .from('share_link_visits')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', ANALYTICS_START_AT_ISO)
       .eq('visitor_is_anonymous', true);
     if (!anonErr) total_anon_visitors = anonData?.count || 0;
   } catch (e) {
@@ -940,8 +941,7 @@ async function buildOverviewFallback() {
   try {
     const { data: attrData, error: attrErr } = await supabase
       .from('share_link_oauth_attributions')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', ANALYTICS_START_AT_ISO);
+      .select('id', { count: 'exact', head: true });
     if (!attrErr) share_attributed_emails = attrData?.count || 0;
   } catch (e) {
     console.warn('[admin] share attributed emails count:', e?.message);
@@ -954,8 +954,7 @@ async function buildOverviewFallback() {
   try {
     const { data: inqData, error: inqErr } = await supabase
       .from('product_inquiries')
-      .select('id, status, created_at', { count: 'exact' })
-      .gte('created_at', ANALYTICS_START_AT_ISO);
+      .select('id, status, created_at', { count: 'exact' });
     if (!inqErr && inqData) {
       total_inquiries = inqData.length;
       replied_inquiries = inqData.filter((r) => r.status === 'replied').length;
@@ -984,16 +983,13 @@ async function buildOverviewFallback() {
 async function buildUserTrendsFallback(days) {
   const n = Math.max(1, Math.min(365, Number(days) || 30));
   const users = await fetchAllAuthUsersForAdmin({
-    excludeInternal: true,
-    createdAtGteIso: ANALYTICS_START_AT_ISO,
+    excludeInternal: false,
   });
   const vipSet = await loadVipUserIdSet();
   const end = new Date();
   const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
   const startUtc = new Date(endUtc);
   startUtc.setUTCDate(startUtc.getUTCDate() - (n - 1));
-  const analyticsStartTs = new Date(ANALYTICS_START_AT_ISO).getTime();
-  const rangeStartTs = Number.isNaN(analyticsStartTs) ? startUtc.getTime() : Math.max(startUtc.getTime(), analyticsStartTs);
   const dayMap = new Map();
   for (let i = 0; i < n; i += 1) {
     const d = new Date(startUtc);
@@ -1003,7 +999,7 @@ async function buildUserTrendsFallback(days) {
   }
   for (const u of users) {
     const ts = new Date(u.created_at || 0).getTime();
-    if (Number.isNaN(ts) || ts < rangeStartTs) continue;
+    if (Number.isNaN(ts)) continue;
     const day = new Date(ts).toISOString().slice(0, 10);
     const row = dayMap.get(day);
     if (!row) continue;
@@ -1037,8 +1033,7 @@ async function fetchAllPromptLogsSince(sinceIso) {
 async function buildConversationUsageFallback(days) {
   const n = Math.max(1, Math.min(365, days));
   const users = await fetchAllAuthUsersForAdmin({
-    excludeInternal: true,
-    createdAtGteIso: ANALYTICS_START_AT_ISO,
+    excludeInternal: false,
   });
   const anonById = new Map();
   for (const u of users) {
@@ -1058,9 +1053,7 @@ async function buildConversationUsageFallback(days) {
   const endUtc = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
   const startUtc = new Date(endUtc);
   startUtc.setUTCDate(startUtc.getUTCDate() - (n - 1));
-  const analyticsStartTs = new Date(ANALYTICS_START_AT_ISO).getTime();
-  const sinceTs = Number.isNaN(analyticsStartTs) ? startUtc.getTime() : Math.max(startUtc.getTime(), analyticsStartTs);
-  const sinceIso = new Date(sinceTs).toISOString();
+  const sinceIso = startUtc.toISOString();
 
   let logs = [];
   try {
@@ -1209,13 +1202,9 @@ app.get('/admin/api/overview', async (_req, res) => {
 
 app.get('/admin/api/trends', async (req, res) => {
   try {
-    const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
-    const { data, error } = await supabase.rpc('admin_trends', { p_days: days });
-    if (error) {
-      console.error('[admin] admin_trends:', error.message, error);
-      return res.status(500).json({ ok: false, error: error.message, code: error.code });
-    }
-    return res.json({ ok: true, data: normalizeTrendsPayload(data) });
+    const days = clampDays(req.query.days);
+    const data = await buildUserTrendsFallback(days);
+    return res.json({ ok: true, data });
   } catch (e) {
     console.error('[admin] /admin/api/trends:', e);
     return res.status(500).json({ ok: false, error: e?.message || String(e) });
@@ -1224,12 +1213,7 @@ app.get('/admin/api/trends', async (req, res) => {
 
 app.get('/admin/api/conversation-usage', async (req, res) => {
   try {
-    const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
-    const { data, error } = await supabase.rpc('admin_conversation_usage', { p_days: days });
-    if (!error) {
-      return res.json({ ok: true, data: normalizeTrendsPayload(data) });
-    }
-    console.warn('[admin] admin_conversation_usage RPC failed, using table scan fallback:', error.message);
+    const days = clampDays(req.query.days);
     const { series } = await buildConversationUsageFallback(days);
     return res.json({ ok: true, data: series });
   } catch (e) {
@@ -1240,7 +1224,7 @@ app.get('/admin/api/conversation-usage', async (req, res) => {
 
 app.get('/admin/api/share-insights', async (req, res) => {
   try {
-    const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
+    const days = clampDays(req.query.days);
     const { data, error } = await supabase.rpc('admin_share_insights', { p_days: days });
     if (error) {
       console.error('[admin] admin_share_insights:', error.message, error);
@@ -1369,7 +1353,7 @@ app.get('/admin/api/url-inputs', async (req, res) => {
 
 app.get('/admin/api/model-usage', async (req, res) => {
   try {
-    const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
+    const days = clampDays(req.query.days);
     const sql = `
       WITH logs AS (
         SELECT *
@@ -1404,7 +1388,7 @@ app.get('/admin/api/model-replies', async (req, res) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.max(1, Math.min(100, Number(req.query.pageSize) || 20));
-    const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
+    const days = clampDays(req.query.days);
     const offset = (page - 1) * pageSize;
     const to = offset + pageSize - 1;
     const modelId = String(req.query.modelId || '').trim();
@@ -1887,7 +1871,9 @@ async function listUsersFallback({ page, pageSize, keyword, vipOnly }) {
     if (row?.user_id) vipMap.set(String(row.user_id), !!row.is_vip);
   }
 
-  const allUsers = await fetchAllAuthUsersForAdmin();
+  const allUsers = await fetchAllAuthUsersForAdmin({
+    excludeInternal: false,
+  });
 
   const kw = keyword.toLowerCase();
   let rows = allUsers
@@ -1898,6 +1884,7 @@ async function listUsersFallback({ page, pageSize, keyword, vipOnly }) {
       created_at: u.created_at,
       last_sign_in_at: u.last_sign_in_at,
       is_vip: vipMap.get(String(u.id)) === true,
+      is_internal: isInternalTestEmail(u.email),
     }))
     .filter((r) => {
       if (vipOnly && !r.is_vip) return false;
@@ -1965,6 +1952,20 @@ function groupPromptLogsByConversation(logs) {
   return [...map.values()].sort((a, b) => new Date(b.last_at) - new Date(a.last_at));
 }
 
+function groupAiRepliesByConversation(rows) {
+  const arr = Array.isArray(rows) ? rows : [];
+  const map = new Map();
+  for (const row of arr) {
+    const cid = row.conversation_id ? String(row.conversation_id) : '(无 conversation_id)';
+    if (!map.has(cid)) map.set(cid, []);
+    map.get(cid).push(row);
+  }
+  for (const list of map.values()) {
+    list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+  return map;
+}
+
 async function resolveAdminUser360Query(q) {
   const raw = String(q || '').trim();
   if (!raw) return { status: 'empty' };
@@ -2019,6 +2020,35 @@ async function buildUser360Payload(authUser) {
 
   const prompt_logs = Array.isArray(promptLogsRaw) ? promptLogsRaw : [];
   const conversations = groupPromptLogsByConversation(prompt_logs);
+  let aiRepliesRaw = [];
+  try {
+    const rs = await supabase
+      .from('ai_model_reply_logs')
+      .select(
+        'id, conversation_id, created_at, model_id, model_route, has_image, user_prompt_preview, assistant_reply_preview',
+      )
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false })
+      .limit(800);
+    if (rs.error && /user_prompt_preview|assistant_reply_preview/i.test(String(rs.error.message || ''))) {
+      const legacy = await supabase
+        .from('ai_model_reply_logs')
+        .select('id, conversation_id, created_at, model_id, model_route, has_image')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(800);
+      aiRepliesRaw = (legacy.data || []).map((x) => ({ ...x, user_prompt_preview: '', assistant_reply_preview: '' }));
+    } else {
+      aiRepliesRaw = Array.isArray(rs.data) ? rs.data : [];
+    }
+  } catch (e) {
+    aiRepliesRaw = [];
+  }
+  const aiRepliesByConversation = groupAiRepliesByConversation(aiRepliesRaw);
+  for (const c of conversations) {
+    c.ai_replies = aiRepliesByConversation.get(String(c.conversation_id || '(无 conversation_id)')) || [];
+    c.ai_reply_count = c.ai_replies.length;
+  }
 
   const { data: shareLinks } = await supabase
     .from('share_links')
@@ -2107,6 +2137,8 @@ async function buildUser360Payload(authUser) {
     inquiries: Array.isArray(inquiries) ? inquiries : [],
     prompt_logs,
     prompt_log_count: prompt_logs.length,
+    ai_replies: aiRepliesRaw,
+    ai_reply_count: aiRepliesRaw.length,
     conversations,
     conversation_count: conversations.length,
     share: {
@@ -2152,19 +2184,6 @@ app.get('/admin/api/users', async (req, res) => {
     const pageSize = Math.max(1, Math.min(100, Number(req.query.pageSize) || 20));
     const keyword = String(req.query.keyword || '').trim();
     const vipOnly = String(req.query.vipOnly || '') === '1' || String(req.query.vipOnly || '').toLowerCase() === 'true';
-
-    const { data, error } = await supabase.rpc('admin_users', {
-      p_keyword: keyword,
-      p_page: page,
-      p_page_size: pageSize,
-      p_vip_only: vipOnly,
-    });
-
-    if (!error) {
-      return res.json({ ok: true, data });
-    }
-
-    console.warn('[admin] admin_users RPC failed, using Auth Admin fallback:', error.message);
     const fallback = await listUsersFallback({ page, pageSize, keyword, vipOnly });
     return res.json({ ok: true, data: fallback });
   } catch (e) {

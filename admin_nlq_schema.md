@@ -1,6 +1,6 @@
 # Admin NLQ Schema (auto-generated)
 
-Updated at: 2026-04-15T05:57:26.369Z
+Updated at: 2026-04-15T07:43:41.693Z
 
 Use this schema to answer admin natural-language questions by generating SELECT SQL only.
 
@@ -346,6 +346,14 @@ Use this schema to answer admin natural-language questions by generating SELECT 
   - `created_at` timestamp with time zone
   - `updated_at` timestamp with time zone
   - `last_used_at` timestamp with time zone
+
+- `public.admin_accounts`
+  - `id` bigint
+  - `username` text
+  - `password_hash` text
+  - `is_active` boolean
+  - `created_at` timestamp with time zone
+  - `updated_at` timestamp with time zone
 
 - `public.app_analytics_events`
   - `id` bigint
