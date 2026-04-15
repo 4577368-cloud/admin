@@ -153,12 +153,12 @@
       <div class="card"><div class="k">VIP 用户</div><div class="v" id="mVip">-</div></div>
       <div class="card"><div class="k">VIP 占比</div><div class="v" id="mVipRatio">-</div></div>
       <div class="card"><div class="k">今日新增用户</div><div class="v" id="mTodayNew">-</div></div>
+      <div class="card"><div class="k">昨日新增用户</div><div class="v" id="mYesterdayNew">-</div></div>
       <div class="card"><div class="k">分享归因邮箱</div><div class="v" id="mShareAttr">-</div></div>
       <div class="card"><div class="k">总匿名访客</div><div class="v" id="mAnonVisits">-</div></div>
       <div class="card"><div class="k">总询盘数</div><div class="v" id="mTotalInq">-</div></div>
       <div class="card"><div class="k">询盘已回复</div><div class="v" id="mRepliedInq">-</div></div>
       <div class="card"><div class="k">今日新增询盘</div><div class="v" id="mTodayInq">-</div></div>
-      <div class="card"><div class="k">近 30 天新增</div><div class="v" id="m30d">-</div></div>
     </div>
     <div class="err" id="errOverview" style="margin-bottom:12px;"></div>
 
@@ -312,7 +312,7 @@
       <div style="margin-top: 20px; border-top: 1px solid #1f2a44; padding-top: 16px;">
         <h3 class="panel-title" style="margin-bottom: 10px;">模型回复记录（含用户提问）</h3>
         <div class="row">
-          <input id="modelRepliesKw" type="text" placeholder="筛选：会话ID / 用户问题 / 模型回答" style="min-width:220px;flex:1;" />
+          <input id="modelRepliesKw" type="text" placeholder="筛选：邮箱 / 用户ID / 会话ID / 用户问题 / 模型回答" style="min-width:220px;flex:1;" />
           <input id="modelRepliesModel" type="text" placeholder="按模型ID筛选（可选）" style="min-width:160px;" />
           <button type="button" id="queryModelRepliesBtn">查询</button>
         </div>
@@ -890,8 +890,8 @@
       el('mTotal').textContent = fmt(d.total_users);
       el('mVip').textContent = fmt(d.vip_users);
       el('mVipRatio').textContent = d.vip_ratio == null ? '-' : `${d.vip_ratio}%`;
-      el('m30d').textContent = fmt(d.new_users_30d);
       el('mTodayNew').textContent = fmt(d.new_users_today);
+      el('mYesterdayNew').textContent = fmt(d.yesterday_new_users);
       el('mShareAttr').textContent = fmt(d.share_attributed_emails);
       el('mAnonVisits').textContent = fmt(d.total_anon_visitors);
       el('mTotalInq').textContent = fmt(d.total_inquiries);
@@ -1880,6 +1880,11 @@
           }
           links.forEach((l) => l.classList.remove('active'));
           a.classList.add('active');
+          if (targetId === 'inquiries' && !el('inquiriesTbody').innerHTML.trim()) {
+            loadInquiries(1).catch((err) => {
+              el('errInquiries').textContent = err?.message || String(err);
+            });
+          }
         });
       });
 

@@ -866,6 +866,36 @@ async function fetchAllAuthUsersForAdmin(options = {}) {
   return users;
 }
 
+async function countDistinctAnonymousVisitors() {
+  const seen = new Set();
+  const pageSize = 1000;
+  let offset = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from('share_link_visits')
+      .select('visitor_user_id, visitor_email, created_at')
+      .eq('visitor_is_anonymous', true)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message || 'query share_link_visits failed');
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length === 0) break;
+    for (const r of rows) {
+      const uid = String(r?.visitor_user_id || '').trim().toLowerCase();
+      const em = normalizeEmail(r?.visitor_email || '');
+      if (uid) {
+        seen.add(`uid:${uid}`);
+      } else if (em) {
+        seen.add(`em:${em}`);
+      }
+    }
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+    if (offset > 300000) break;
+  }
+  return seen.size;
+}
+
 async function loadVipUserIdSet() {
   const vip = new Set();
   const { data: statsRows, error } = await supabase.from('user_stats').select('user_id, is_vip');
@@ -922,16 +952,18 @@ async function buildOverviewFallback() {
   // Today's new users (Shanghai timezone)
   const todayShanghai = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
   const todayStart = new Date(todayShanghai + ' 00:00:00');
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   const new_users_today = merged.filter((u) => new Date(u.created_at || 0).getTime() >= todayStart.getTime()).length;
+  const yesterday_new_users = merged.filter((u) => {
+    const ts = new Date(u.created_at || 0).getTime();
+    return ts >= yesterdayStart.getTime() && ts < todayStart.getTime();
+  }).length;
 
-  // Anonymous visitors from share_link_visits
+  // Anonymous visitors from share_link_visits (distinct users, not visit rows)
   let total_anon_visitors = 0;
   try {
-    const { data: anonData, error: anonErr } = await supabase
-      .from('share_link_visits')
-      .select('id', { count: 'exact', head: true })
-      .eq('visitor_is_anonymous', true);
-    if (!anonErr) total_anon_visitors = anonData?.count || 0;
+    total_anon_visitors = await countDistinctAnonymousVisitors();
   } catch (e) {
     console.warn('[admin] anon visitors count:', e?.message);
   }
@@ -971,6 +1003,7 @@ async function buildOverviewFallback() {
     new_users_7d,
     new_users_30d,
     new_users_today,
+    yesterday_new_users,
     total_anon_visitors,
     share_attributed_emails,
     total_inquiries,
@@ -1393,6 +1426,16 @@ app.get('/admin/api/model-replies', async (req, res) => {
     const to = offset + pageSize - 1;
     const modelId = String(req.query.modelId || '').trim();
     const keyword = String(req.query.keyword || '').trim();
+    const keywordLower = keyword.toLowerCase();
+    let matchedUserIdsByEmail = [];
+    if (keyword && keyword.includes('@')) {
+      const users = await fetchAllAuthUsersForAdmin({ excludeInternal: false });
+      matchedUserIdsByEmail = users
+        .filter((u) => normalizeEmail(u.email).includes(keywordLower))
+        .map((u) => String(u.id || '').trim())
+        .filter(Boolean)
+        .slice(0, 500);
+    }
 
     const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     let query = supabase
@@ -1405,8 +1448,14 @@ app.get('/admin/api/model-replies', async (req, res) => {
 
     if (modelId) query = query.eq('model_id', modelId);
     if (keyword) {
-      const like = `%${keyword}%`;
-      query = query.or(`conversation_id.ilike.${like},user_prompt_preview.ilike.${like},assistant_reply_preview.ilike.${like}`);
+      if (matchedUserIdsByEmail.length > 0) {
+        query = query.in('user_id', matchedUserIdsByEmail);
+      } else {
+        const like = `%${keyword}%`;
+        query = query.or(
+          `conversation_id.ilike.${like},user_id.ilike.${like},user_prompt_preview.ilike.${like},assistant_reply_preview.ilike.${like}`,
+        );
+      }
     }
 
     let { data, error, count } = await query;
@@ -1419,7 +1468,14 @@ app.get('/admin/api/model-replies', async (req, res) => {
         .order('id', { ascending: false })
         .range(offset, to);
       if (modelId) fallback = fallback.eq('model_id', modelId);
-      if (keyword) fallback = fallback.ilike('conversation_id', `%${keyword}%`);
+      if (keyword) {
+        if (matchedUserIdsByEmail.length > 0) {
+          fallback = fallback.in('user_id', matchedUserIdsByEmail);
+        } else {
+          const like = `%${keyword}%`;
+          fallback = fallback.or(`conversation_id.ilike.${like},user_id.ilike.${like}`);
+        }
+      }
       const fallbackRes = await fallback;
       data = (fallbackRes.data || []).map((r) => ({ ...r, user_prompt_preview: '', assistant_reply_preview: '' }));
       error = fallbackRes.error;
