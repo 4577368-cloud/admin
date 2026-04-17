@@ -324,6 +324,16 @@ async function touchMemoryHit(id) {
   } catch (_) {}
 }
 
+/** Stored in nlq_query_memory.sql_text when the NLQ path was RPC (not admin_execute_select_sql). */
+const NLQ_RPC_MEMORY_PREFIX = '__NLQ_RPC__:';
+
+function buildNlqRpcMemoryText(rpc, args) {
+  const r = String(rpc || '').trim();
+  if (!r) return '';
+  const a = args && typeof args === 'object' ? args : {};
+  return `${NLQ_RPC_MEMORY_PREFIX}${JSON.stringify({ rpc: r, args: a })}`;
+}
+
 async function upsertMemorySql(question, sql) {
   const normalized = normalizeQuestionForMemory(question);
   if (!normalized || !sql) return;
@@ -1529,6 +1539,7 @@ app.post('/admin/api/nlq', async (req, res) => {
         return res.status(500).json({ ok: false, error: error.message, code: error.code });
       }
       const rows = Array.isArray(data?.rows) ? data.rows : [];
+      await upsertMemorySql(question, sql);
       const aiMarkdown = await askLlmForAnswerMarkdown(question, rows);
       appendNlqTurn(sessionId, { question, action: 'preset:today_registered_count_and_emails' });
       return res.json({
@@ -1562,6 +1573,7 @@ app.post('/admin/api/nlq', async (req, res) => {
         return res.status(500).json({ ok: false, error: error.message, code: error.code });
       }
       const rows = Array.isArray(data?.rows) ? data.rows : [];
+      await upsertMemorySql(question, sql);
       appendNlqTurn(sessionId, { question, action: 'preset:cumulative_user_split' });
       return res.json({
         ok: true,
@@ -1603,6 +1615,7 @@ app.post('/admin/api/nlq', async (req, res) => {
         return res.status(500).json({ ok: false, error: error.message, code: error.code });
       }
       const rows = Array.isArray(data?.rows) ? data.rows : [];
+      await upsertMemorySql(question, sql);
       const aiMarkdown = await askLlmForAnswerMarkdown(question, rows);
       appendNlqTurn(sessionId, { question, action: 'preset:top_user_prompts_with_daily_avg' });
       return res.json({
@@ -1654,6 +1667,7 @@ app.post('/admin/api/nlq', async (req, res) => {
         return res.status(500).json({ ok: false, error: error.message, code: error.code });
       }
       const rows = Array.isArray(data?.rows) ? data.rows : [];
+      await upsertMemorySql(question, sql);
       appendNlqTurn(sessionId, { question, action: 'preset:anonymous_active_3d_users' });
       return res.json({
         ok: true,
@@ -1689,6 +1703,7 @@ app.post('/admin/api/nlq', async (req, res) => {
         return res.status(500).json({ ok: false, error: error.message, code: error.code });
       }
       const rows = Array.isArray(data?.rows) ? data.rows : [];
+      await upsertMemorySql(question, sql);
       appendNlqTurn(sessionId, { question, action: 'preset:today_anonymous_user_list' });
       return res.json({
         ok: true,
@@ -1737,6 +1752,7 @@ app.post('/admin/api/nlq', async (req, res) => {
         return res.status(500).json({ ok: false, error: error.message, code: error.code });
       }
       const rows = Array.isArray(data?.rows) ? data.rows : [];
+      await upsertMemorySql(question, sql);
       appendNlqTurn(sessionId, { question, action: 'preset:url_conversation_counts_and_list' });
       return res.json({
         ok: true,
@@ -1757,29 +1773,67 @@ app.post('/admin/api/nlq', async (req, res) => {
 
     const memoryHit = await recallSqlFromMemory(question);
     if (memoryHit?.sql_text) {
-      const sql = String(memoryHit.sql_text || '').trim();
-      const { data, error } = await supabase.rpc('admin_execute_select_sql', { p_sql: sql });
-      if (!error && data && data.ok === true) {
-        const rows = Array.isArray(data.rows) ? data.rows : [];
-        const aiMarkdown = await askLlmForAnswerMarkdown(question, rows);
-        appendNlqTurn(sessionId, { question, action: `memory_sql:${sql.slice(0, 180)}` });
-        await touchMemoryHit(memoryHit.id);
-        return res.json({
-          ok: true,
-          data: {
-            session_id: sessionId,
-            context_turns: nextTurn,
-            hit_source: 'memory',
-            memory_match: memoryHit.match_type || 'exact',
-            question,
-            mode: 'sql',
-            sql,
-            explanation: 'memory_reuse',
-            row_count: data.row_count ?? rows.length,
-            rows,
-            answer_text: appendDetailListIfNeeded(question, rows, aiMarkdown || buildNlqAnswerText(question, rows)),
-          },
-        });
+      const raw = String(memoryHit.sql_text || '').trim();
+      if (raw.startsWith(NLQ_RPC_MEMORY_PREFIX)) {
+        let payload = null;
+        try {
+          payload = JSON.parse(raw.slice(NLQ_RPC_MEMORY_PREFIX.length));
+        } catch (_) {
+          payload = null;
+        }
+        const rpc = String(payload?.rpc || '').trim();
+        const args = payload?.args && typeof payload.args === 'object' ? payload.args : {};
+        if (rpc && allowedNlqRpc.has(rpc)) {
+          const { data, error } = await supabase.rpc(rpc, args);
+          if (!error) {
+            const rows = Array.isArray(data) ? data : [data];
+            const aiMarkdown = await askLlmForAnswerMarkdown(question, rows);
+            appendNlqTurn(sessionId, { question, action: `memory_rpc:${rpc}` });
+            await touchMemoryHit(memoryHit.id);
+            return res.json({
+              ok: true,
+              data: {
+                session_id: sessionId,
+                context_turns: nextTurn,
+                hit_source: 'memory',
+                memory_match: memoryHit.match_type || 'exact',
+                question,
+                mode: 'rpc',
+                rpc,
+                args,
+                explanation: 'memory_reuse',
+                row_count: rows.length,
+                rows,
+                answer_text: appendDetailListIfNeeded(question, rows, aiMarkdown || buildNlqAnswerText(question, rows)),
+              },
+            });
+          }
+        }
+      } else {
+        const sql = raw;
+        const { data, error } = await supabase.rpc('admin_execute_select_sql', { p_sql: sql });
+        if (!error && data && data.ok === true) {
+          const rows = Array.isArray(data.rows) ? data.rows : [];
+          const aiMarkdown = await askLlmForAnswerMarkdown(question, rows);
+          appendNlqTurn(sessionId, { question, action: `memory_sql:${sql.slice(0, 180)}` });
+          await touchMemoryHit(memoryHit.id);
+          return res.json({
+            ok: true,
+            data: {
+              session_id: sessionId,
+              context_turns: nextTurn,
+              hit_source: 'memory',
+              memory_match: memoryHit.match_type || 'exact',
+              question,
+              mode: 'sql',
+              sql,
+              explanation: 'memory_reuse',
+              row_count: data.row_count ?? rows.length,
+              rows,
+              answer_text: appendDetailListIfNeeded(question, rows, aiMarkdown || buildNlqAnswerText(question, rows)),
+            },
+          });
+        }
       }
     }
 
@@ -1795,6 +1849,7 @@ app.post('/admin/api/nlq', async (req, res) => {
       if (error) {
         return res.status(500).json({ ok: false, error: error.message, code: error.code, decision });
       }
+      await upsertMemorySql(question, buildNlqRpcMemoryText(rpc, args));
       appendNlqTurn(sessionId, { question, action: `rpc:${rpc}` });
       const rows = Array.isArray(data) ? data : [data];
       const aiMarkdown = await askLlmForAnswerMarkdown(question, rows);
